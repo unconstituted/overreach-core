@@ -1,0 +1,75 @@
+{
+  "$schema": "../schemas/chapter.schema.json",
+  "format": 1,
+  "id": "test-clamp",
+  "title": "Test: the clamp",
+  "subtitle": "A five-minute test chapter that exercises rider-data conditions and branches",
+  "duration": 300,
+  "assets": { "clips": "ch1/clips", "images": "ch1/images" },
+  "workout": {
+    "name": "Clamp test",
+    "steps": [
+      { "kind": "steady", "duration": 60, "power": 0.6, "label": "Approach" },
+      { "kind": "steady", "duration": 60, "power": 1.0, "label": "Hold the clamp", "erg": false },
+      { "kind": "steady", "duration": 60, "power": 0.6, "label": "Settle" },
+      { "kind": "steady", "duration": 60, "power": 0.85, "label": "Tow", "cadence": 95, "erg": false },
+      { "kind": "ramp", "duration": 60, "from": 0.6, "to": 0.45, "label": "Ease off" }
+    ]
+  },
+  "beats": [
+    { "t": 0, "title": "Approach" },
+    { "t": 60, "title": "The clamp" },
+    { "t": 180, "title": "The tow" },
+    { "t": 240, "title": "Clear" }
+  ],
+  "dialogue": [
+    { "t": 50, "clip": "holdon", "subs": [{ "offset": 0, "duration": 1.2, "speaker": "AI", "text": "Hold on." }] },
+    { "t": 250, "clip": "talknow", "if": "clampLocked", "subs": [{ "offset": 0, "duration": 2.2, "speaker": "AI", "text": "We should be able to talk now." }] }
+  ],
+  "glass": [
+    { "t": 245, "text": "WE LOST IT.", "hold": 8, "unless": "clampLocked" }
+  ],
+  "hud": [
+    { "type": "notice", "t": 55, "hold": 6, "kind": "surge", "text": "CLAMP IN 5 · HOLD 95 TO 105%" },
+    { "type": "banner", "from": 180, "to": 240, "text": "TOWING", "tone": "info", "if": "clampLocked" }
+  ],
+  "scene": {
+    "segments": [{ "from": 0, "id": "orbit" }],
+    "speed": [[0, 200], [60, 60], [120, 60], [180, 120], [240, 400], [300, 800]],
+    "curves": { "fov": [[0, 70], [300, 80]], "fade": [[0, 0], [3, 1], [297, 1], [300, 0]] }
+  },
+  "sfx": [
+    { "t": 60, "id": "boom", "args": [0.5] }
+  ],
+  "challenges": [
+    {
+      "id": "clamp",
+      "from": 60,
+      "to": 120,
+      "prompt": "Hold 95 to 105% of FTP for 20 seconds to lock the clamp",
+      "condition": { "metric": "powerFtp", "min": 0.95, "max": 1.05, "hold": 20, "grace": 2 },
+      "onSuccess": {
+        "setFlags": { "clampLocked": true },
+        "hud": [{ "type": "notice", "t": 0, "hold": 6, "kind": "info", "text": "CLAMP LOCKED" }],
+        "sfx": [{ "t": 0, "id": "chime", "args": [990] }],
+        "dialogue": [{ "t": 1, "clip": "beautiful", "subs": [{ "offset": 0.2, "duration": 1.8, "speaker": "AI", "text": "Beautiful, isn’t it?" }] }]
+      },
+      "onFail": {
+        "setFlags": { "clampLocked": false },
+        "hud": [{ "type": "notice", "t": 0, "hold": 6, "kind": "warning", "text": "CLAMP SLIPPED" }],
+        "sfx": [{ "t": 0, "id": "alarm" }],
+        "glass": [{ "t": 2, "text": "AGAIN. SLOWER.", "hold": 6 }]
+      }
+    },
+    {
+      "id": "tow",
+      "if": "clampLocked",
+      "from": 180,
+      "to": 240,
+      "prompt": "Spin above 90 rpm for 15 seconds to break the capsule free",
+      "condition": { "metric": "cadence", "min": 90, "hold": 15, "grace": 1 },
+      "onSuccess": { "setFlags": { "capsuleFree": true }, "hud": [{ "type": "notice", "t": 0, "hold": 5, "kind": "info", "text": "CAPSULE FREE" }] },
+      "onFail": { "hud": [{ "type": "notice", "t": 0, "hold": 5, "kind": "warning", "text": "TOW LINE SLACK" }] }
+    }
+  ]
+}

@@ -13,7 +13,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "validate": "tsx tools/validate-chapters.ts",
+    "ride-script": "tsx tools/ride-script-to-chapter.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

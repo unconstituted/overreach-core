@@ -1,0 +1,1437 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://overreach.game/schemas/chapter.schema.json",
+  "title": "Overreach chapter",
+  "description": "A story chapter: a workout plus timed tracks. See docs/AUTHORING.md.",
+  "type": "object",
+  "required": [
+    "format",
+    "id",
+    "title",
+    "duration",
+    "workout",
+    "scene"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "format": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "subtitle": {
+      "type": "string"
+    },
+    "season": {
+      "type": "integer"
+    },
+    "number": {
+      "type": "integer"
+    },
+    "duration": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Seconds. Must match the workout's total duration."
+    },
+    "assets": {
+      "type": "object",
+      "properties": {
+        "clips": {
+          "type": "string"
+        },
+        "images": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "description": "Folders (relative to the chapter file) holding dialogue clips and images."
+    },
+    "workout": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "pattern": "\\.(zwo|fit)$"
+            }
+          },
+          "required": [
+            "file"
+          ],
+          "additionalProperties": false,
+          "description": "A .zwo or .fit workout file, relative to the chapter file."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "steps": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/step"
+              }
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "additionalProperties": false,
+          "description": "Inline workout steps."
+        }
+      ]
+    },
+    "beats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Seconds from the start of the chapter."
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "t",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Named story beats: the jump list."
+    },
+    "dialogue": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dialogue"
+      }
+    },
+    "glass": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/glass"
+      }
+    },
+    "stills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string"
+          },
+          "from": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Seconds from the start of the chapter."
+          },
+          "to": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Seconds from the start of the chapter."
+          },
+          "fadeIn": {
+            "type": "number"
+          },
+          "fadeOut": {
+            "type": "number"
+          },
+          "start": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "end": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "origin": {
+            "type": "string"
+          },
+          "rotate": {
+            "type": "number"
+          },
+          "visor": {
+            "type": "boolean"
+          },
+          "insert": {
+            "type": "boolean"
+          },
+          "if": {
+            "type": "string",
+            "description": "Only active when this story flag is true."
+          },
+          "unless": {
+            "type": "string",
+            "description": "Only active when this story flag is not true."
+          }
+        },
+        "required": [
+          "image",
+          "from",
+          "to",
+          "fadeIn",
+          "fadeOut",
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "hud": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hud"
+      }
+    },
+    "scene": {
+      "type": "object",
+      "properties": {
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from",
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "camera": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "to": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "mode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "mode"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "defaultCamera": {
+          "type": "string"
+        },
+        "speed": {
+          "$ref": "#/$defs/keys"
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "t": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "values": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "t",
+              "values"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "curves": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/keys"
+          }
+        },
+        "impacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "t": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "strength": {
+                "type": "number"
+              },
+              "flash": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "t",
+              "strength"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "props": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "from": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "to": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "at": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "params": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "markers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Seconds from the start of the chapter."
+          }
+        },
+        "streaks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "values": {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "from",
+              "values"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "segments",
+        "speed"
+      ],
+      "additionalProperties": false
+    },
+    "sfx": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sfx"
+      }
+    },
+    "music": {
+      "type": "object",
+      "properties": {
+        "bpm": {
+          "type": "number"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "to": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Seconds from the start of the chapter."
+              },
+              "mode": {
+                "type": "string"
+              },
+              "party": {
+                "type": "boolean"
+              },
+              "fast": {
+                "type": "boolean"
+              },
+              "level": {
+                "$ref": "#/$defs/curve"
+              },
+              "kick": {
+                "$ref": "#/$defs/curve"
+              },
+              "hat": {
+                "$ref": "#/$defs/curve"
+              },
+              "bass": {
+                "$ref": "#/$defs/curve"
+              },
+              "arp": {
+                "$ref": "#/$defs/curve"
+              },
+              "pad": {
+                "$ref": "#/$defs/curve"
+              },
+              "bright": {
+                "$ref": "#/$defs/curve"
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "mode",
+              "level"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "ambience": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/keys"
+          }
+        }
+      },
+      "required": [
+        "sections"
+      ],
+      "additionalProperties": false
+    },
+    "challenges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "from": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Seconds from the start of the chapter."
+          },
+          "to": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Seconds from the start of the chapter."
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "metric": {
+                "enum": [
+                  "power",
+                  "powerFtp",
+                  "powerTarget",
+                  "cadence",
+                  "heartRate",
+                  "heartRateMax"
+                ]
+              },
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "hold": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "grace": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "metric",
+              "hold"
+            ],
+            "additionalProperties": false
+          },
+          "onSuccess": {
+            "$ref": "#/$defs/branch"
+          },
+          "onFail": {
+            "$ref": "#/$defs/branch"
+          },
+          "if": {
+            "type": "string",
+            "description": "Only active when this story flag is true."
+          },
+          "unless": {
+            "type": "string",
+            "description": "Only active when this story flag is not true."
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "condition"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "Author notes pinned to the clock. Ignored by the runtime.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "number",
+            "minimum": 0
+          },
+          "kind": {
+            "enum": [
+              "see",
+              "hear",
+              "todo"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "t",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "keys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "prefixItems": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "number"
+          }
+        ],
+        "minItems": 2,
+        "maxItems": 2
+      },
+      "description": "Linear keyframes: [time, value] pairs in time order."
+    },
+    "curve": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/keys"
+        }
+      ],
+      "description": "A constant, or keyframes."
+    },
+    "step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "steady"
+            },
+            "duration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "power": {
+              "type": "number",
+              "description": "Fraction of FTP (1.0 = FTP)."
+            },
+            "watts": {
+              "type": "number"
+            },
+            "cadence": {
+              "type": "number"
+            },
+            "label": {
+              "type": "string"
+            },
+            "erg": {
+              "type": "boolean"
+            },
+            "intensity": {
+              "enum": [
+                "warmup",
+                "active",
+                "recovery",
+                "rest",
+                "cooldown",
+                "interval"
+              ]
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "duration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "ramp"
+            },
+            "duration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "from": {
+              "type": "number"
+            },
+            "to": {
+              "type": "number"
+            },
+            "unit": {
+              "enum": [
+                "ftp",
+                "watts"
+              ]
+            },
+            "cadence": {
+              "type": "number"
+            },
+            "label": {
+              "type": "string"
+            },
+            "erg": {
+              "type": "boolean"
+            },
+            "intensity": {
+              "enum": [
+                "warmup",
+                "active",
+                "recovery",
+                "rest",
+                "cooldown",
+                "interval"
+              ]
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "duration",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "free"
+            },
+            "duration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "cadence": {
+              "type": "number"
+            },
+            "label": {
+              "type": "string"
+            },
+            "intensity": {
+              "enum": [
+                "warmup",
+                "active",
+                "recovery",
+                "rest",
+                "cooldown",
+                "interval"
+              ]
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "duration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "intervals"
+            },
+            "repeat": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "on": {
+              "type": "object",
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "power": {
+                  "type": "number",
+                  "description": "Fraction of FTP (1.0 = FTP)."
+                },
+                "watts": {
+                  "type": "number"
+                },
+                "cadence": {
+                  "type": "number"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "duration"
+              ],
+              "additionalProperties": false
+            },
+            "off": {
+              "type": "object",
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "power": {
+                  "type": "number",
+                  "description": "Fraction of FTP (1.0 = FTP)."
+                },
+                "watts": {
+                  "type": "number"
+                },
+                "cadence": {
+                  "type": "number"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "duration"
+              ],
+              "additionalProperties": false
+            },
+            "erg": {
+              "type": "boolean"
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "repeat",
+            "on",
+            "off"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "dialogue": {
+      "type": "object",
+      "properties": {
+        "t": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Seconds from the start of the chapter."
+        },
+        "clip": {
+          "type": "string"
+        },
+        "gain": {
+          "type": "number"
+        },
+        "rate": {
+          "type": "number"
+        },
+        "radio": {
+          "type": "boolean"
+        },
+        "reverb": {
+          "type": "boolean"
+        },
+        "duration": {
+          "type": "number"
+        },
+        "subs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "offset": {
+                "type": "number"
+              },
+              "duration": {
+                "type": "number"
+              },
+              "speaker": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "offset",
+              "duration",
+              "speaker",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "if": {
+          "type": "string",
+          "description": "Only active when this story flag is true."
+        },
+        "unless": {
+          "type": "string",
+          "description": "Only active when this story flag is not true."
+        }
+      },
+      "required": [
+        "t",
+        "clip"
+      ],
+      "additionalProperties": false
+    },
+    "glass": {
+      "type": "object",
+      "properties": {
+        "t": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Seconds from the start of the chapter."
+        },
+        "text": {
+          "type": "string"
+        },
+        "hold": {
+          "type": "number"
+        },
+        "if": {
+          "type": "string",
+          "description": "Only active when this story flag is true."
+        },
+        "unless": {
+          "type": "string",
+          "description": "Only active when this story flag is not true."
+        }
+      },
+      "required": [
+        "t",
+        "text",
+        "hold"
+      ],
+      "additionalProperties": false
+    },
+    "sfx": {
+      "type": "object",
+      "properties": {
+        "t": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Seconds from the start of the chapter."
+        },
+        "id": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "if": {
+          "type": "string",
+          "description": "Only active when this story flag is true."
+        },
+        "unless": {
+          "type": "string",
+          "description": "Only active when this story flag is not true."
+        }
+      },
+      "required": [
+        "t",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "hud": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "title"
+            },
+            "from": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "to": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "fadeIn": {
+              "type": "number"
+            },
+            "fadeOut": {
+              "type": "number"
+            },
+            "small": {
+              "type": "string"
+            },
+            "big": {
+              "type": "string"
+            },
+            "em": {
+              "type": "string"
+            },
+            "if": {
+              "type": "string",
+              "description": "Only active when this story flag is true."
+            },
+            "unless": {
+              "type": "string",
+              "description": "Only active when this story flag is not true."
+            }
+          },
+          "required": [
+            "type",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "banner"
+            },
+            "from": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "to": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "text": {
+              "type": "string"
+            },
+            "tone": {
+              "enum": [
+                "warning",
+                "info"
+              ]
+            },
+            "blink": {
+              "type": "boolean"
+            },
+            "if": {
+              "type": "string",
+              "description": "Only active when this story flag is true."
+            },
+            "unless": {
+              "type": "string",
+              "description": "Only active when this story flag is not true."
+            }
+          },
+          "required": [
+            "type",
+            "from",
+            "to",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "notice"
+            },
+            "t": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "hold": {
+              "type": "number"
+            },
+            "kind": {
+              "enum": [
+                "location",
+                "distance",
+                "ai",
+                "surge",
+                "warning",
+                "info"
+              ]
+            },
+            "text": {
+              "type": "string"
+            },
+            "if": {
+              "type": "string",
+              "description": "Only active when this story flag is true."
+            },
+            "unless": {
+              "type": "string",
+              "description": "Only active when this story flag is not true."
+            }
+          },
+          "required": [
+            "type",
+            "t",
+            "hold",
+            "kind",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "waypoint"
+            },
+            "from": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "to": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "label": {
+              "type": "string"
+            },
+            "distanceTo": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "value": {
+              "$ref": "#/$defs/keys"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "decimals": {
+              "type": "integer"
+            },
+            "extra": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "$ref": "#/$defs/keys"
+                },
+                "unit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "x": {
+              "$ref": "#/$defs/curve"
+            },
+            "y": {
+              "$ref": "#/$defs/curve"
+            },
+            "if": {
+              "type": "string",
+              "description": "Only active when this story flag is true."
+            },
+            "unless": {
+              "type": "string",
+              "description": "Only active when this story flag is not true."
+            }
+          },
+          "required": [
+            "type",
+            "from",
+            "to",
+            "label"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "hide"
+            },
+            "from": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "to": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "elements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "if": {
+              "type": "string",
+              "description": "Only active when this story flag is true."
+            },
+            "unless": {
+              "type": "string",
+              "description": "Only active when this story flag is not true."
+            }
+          },
+          "required": [
+            "type",
+            "from",
+            "to",
+            "elements"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "widget"
+            },
+            "id": {
+              "type": "string"
+            },
+            "from": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "to": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "params": {
+              "type": "object"
+            },
+            "if": {
+              "type": "string",
+              "description": "Only active when this story flag is true."
+            },
+            "unless": {
+              "type": "string",
+              "description": "Only active when this story flag is not true."
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "effect"
+            },
+            "id": {
+              "type": "string"
+            },
+            "from": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "to": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Seconds from the start of the chapter."
+            },
+            "if": {
+              "type": "string",
+              "description": "Only active when this story flag is true."
+            },
+            "unless": {
+              "type": "string",
+              "description": "Only active when this story flag is not true."
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "branch": {
+      "type": "object",
+      "properties": {
+        "setFlags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "dialogue": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dialogue"
+          }
+        },
+        "glass": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/glass"
+          }
+        },
+        "hud": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hud"
+          }
+        },
+        "sfx": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sfx"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "description": "What happens when a challenge resolves. Times inside are relative to that moment."
+    }
+  }
+}
