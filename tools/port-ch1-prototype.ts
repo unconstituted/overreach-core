@@ -251,7 +251,10 @@ const chapter: Chapter = {
   hud,
   scene,
   sfx: P.sfx.map((s) => ({ t: round(s.t), id: s.id, ...(s.args.length ? { args: s.args.map((a) => round(a)) } : {}) })).sort((a, b) => a.t - b.t),
-  music: { bpm: 90, sections, ambience },
+  music: {
+    bpm: 90, sections, ambience,
+    loops: { hangar: { clip: 'hangar' }, murmur: { clip: 'call', reverse: true, rate: 0.62, lowpass: 600, reverb: true } },
+  },
 };
 
 /* ---------- write (compact arrays, one item per line) ---------- */

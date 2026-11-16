@@ -35,7 +35,12 @@ export class DeviceManager {
   private unsubHeart: Unsubscribe[] = [];
   private lastTarget?: number;
 
-  constructor(private readonly simOptions: SimRiderOptions & SimHeartOptions = {}) {}
+  constructor(private simOptions: SimRiderOptions & SimHeartOptions = {}) {}
+
+  /** Change the simulated rider's profile (FTP and so on). Applies to simulated devices created afterwards. */
+  setSimOptions(opts: SimRiderOptions & SimHeartOptions): void {
+    this.simOptions = { ...this.simOptions, ...opts };
+  }
 
   summary(): DeviceSummary {
     return {

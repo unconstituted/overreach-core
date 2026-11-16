@@ -498,6 +498,34 @@
           "additionalProperties": {
             "$ref": "#/$defs/keys"
           }
+        },
+        "loops": {
+          "type": "object",
+          "description": "Looping clips; the ambience curve of the same name sets the gain.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "clip": {
+                "type": "string"
+              },
+              "reverse": {
+                "type": "boolean"
+              },
+              "rate": {
+                "type": "number"
+              },
+              "lowpass": {
+                "type": "number"
+              },
+              "reverb": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "clip"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [

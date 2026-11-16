@@ -185,6 +185,11 @@ export interface MusicTrack {
   sections: MusicSection[];
   /** Named curves for continuous sound layers (drone, ring, hangar ...). */
   ambience?: Record<string, Keys>;
+  /**
+   * Looping clips. The ambience curve with the same name sets the gain, and
+   * `<name>Cutoff`, if present, a low-pass filter frequency.
+   */
+  loops?: Record<string, { clip: string; reverse?: boolean; rate?: number; lowpass?: number; reverb?: boolean }>;
 }
 
 export type Metric = 'power' | 'powerFtp' | 'powerTarget' | 'cadence' | 'heartRate' | 'heartRateMax';

@@ -208,6 +208,28 @@ export class ChapterRuntime {
   distanceAt(t: number): number { return this.distance.at(t); }
   get time(): number { return this.last ?? 0; }
 
+  /** Music direction at a time. Cheap, so a sequencer can ask about the steps it schedules ahead. */
+  musicAt(t: number): MusicState {
+    const ch = this.chapter;
+    const music: MusicState = { level: 0, kick: 0, hat: 0, bass: 0, arp: 0, pad: 0, bright: 0.4, mode: 'main', party: false, fast: false, ambience: {} };
+    for (const m of ch.music?.sections ?? []) {
+      if (t < m.from || t >= m.to) continue;
+      music.level = evalCurve(m.level, t);
+      music.kick = evalCurve(m.kick, t);
+      music.hat = evalCurve(m.hat, t);
+      music.bass = evalCurve(m.bass, t);
+      music.arp = evalCurve(m.arp, t);
+      music.pad = evalCurve(m.pad, t);
+      music.bright = evalCurve(m.bright, t, 0.4);
+      music.mode = m.mode;
+      music.party = !!m.party;
+      music.fast = !!m.fast;
+      break;
+    }
+    for (const name of this.ambienceNames) music.ambience[name] = evalKeys((ch.music?.ambience as Record<string, [number, number][]>)[name], t);
+    return music;
+  }
+
   /* ------------------------------------------------------------------ */
   /* Pure state                                                          */
   /* ------------------------------------------------------------------ */
@@ -327,23 +349,7 @@ export class ChapterRuntime {
     }
     hud.notices.sort((a, b) => a.t - b.t);
 
-    // Music
-    const music: MusicState = { level: 0, kick: 0, hat: 0, bass: 0, arp: 0, pad: 0, bright: 0.4, mode: 'main', party: false, fast: false, ambience: {} };
-    for (const m of ch.music?.sections ?? []) {
-      if (t < m.from || t >= m.to) continue;
-      music.level = evalCurve(m.level, t);
-      music.kick = evalCurve(m.kick, t);
-      music.hat = evalCurve(m.hat, t);
-      music.bass = evalCurve(m.bass, t);
-      music.arp = evalCurve(m.arp, t);
-      music.pad = evalCurve(m.pad, t);
-      music.bright = evalCurve(m.bright, t, 0.4);
-      music.mode = m.mode;
-      music.party = !!m.party;
-      music.fast = !!m.fast;
-      break;
-    }
-    for (const name of this.ambienceNames) music.ambience[name] = evalKeys((ch.music?.ambience as Record<string, [number, number][]>)[name], t);
+    const music = this.musicAt(t);
 
     // Challenges
     const challenges: ChallengeState[] = (ch.challenges ?? []).map((c) => {
