@@ -11,6 +11,10 @@ export default tseslint.config(
     },
   },
   {
+    files: ['tools/**/*.mjs', 'tools/**/*.ts'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+  },
+  {
     // The core must stay portable: no DOM, no Three.js, no browser APIs.
     files: ['src/core/**/*.ts'],
     rules: {
