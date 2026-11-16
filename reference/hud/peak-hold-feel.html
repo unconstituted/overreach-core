@@ -1,0 +1,230 @@
+<title>Overreach Peak Hold HUD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@50..125,100..900&display=swap">
+<style>
+:root{color-scheme:dark;--bg:#04060a;--ink:#e9f1f7;--cy:#8fdcec;--dim:rgba(233,241,247,.55);--faint:rgba(233,241,247,.22);--amb:#ffb454;--red:#ff4a4a;--line:rgba(255,255,255,.14);--panel:rgba(8,11,18,.92);
+ --num:"Saira","Avenir Next Condensed","DIN Condensed","Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--body:-apple-system,"Helvetica Neue",Arial,sans-serif}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);overflow:hidden}
+#bg{position:fixed;inset:0;width:100%;height:100%;display:block}
+#bar{position:fixed;top:0;left:0;right:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:5}
+#bar h1{font:600 13px var(--mono);letter-spacing:.3em;margin:0 10px 0 0;white-space:nowrap;color:var(--dim)}
+button{font:600 11px var(--mono);letter-spacing:.08em;color:var(--ink);background:rgba(12,16,26,.85);border:1px solid var(--line);padding:8px 11px;border-radius:3px;cursor:pointer}
+button:hover{background:rgba(40,52,74,.9)}button.on{background:var(--ink);color:#05070c;border-color:var(--ink)}
+.sp{flex:1 1 auto}
+/* ---------- HUD ---------- */
+#hud{position:fixed;left:0;right:0;bottom:0;top:0;pointer-events:none;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:max(26px,5vh);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));will-change:transform}
+#shift{display:flex;gap:3px;align-items:center;margin-bottom:clamp(14px,3vh,30px)}
+#shift i{display:block;width:clamp(9px,1.5vw,20px);height:3px;background:var(--faint);transition:background .06s}
+#shift i.gap{width:clamp(20px,4vw,54px);background:none}
+#cluster{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:clamp(18px,5vw,84px);padding:18px clamp(14px,3vw,40px) 14px}
+#cluster .br{position:absolute;width:16px;height:16px;border:1px solid var(--dim);opacity:.8}
+#cluster .br.tl{left:var(--in);top:var(--in);border-right:0;border-bottom:0}#cluster .br.tr{right:var(--in);top:var(--in);border-left:0;border-bottom:0}#cluster .br.bl{left:var(--in);bottom:var(--in);border-right:0;border-top:0}#cluster .br.brr{right:var(--in);bottom:var(--in);border-left:0;border-top:0}
+.inst{display:flex;flex-direction:column;align-items:center;min-width:0}
+.lab{font:600 clamp(9px,1vw,11px) var(--mono);letter-spacing:.28em;color:var(--dim);white-space:nowrap;height:16px}
+.unit{font:600 clamp(8px,.9vw,10px) var(--mono);letter-spacing:.34em;color:var(--faint);margin-top:6px}
+.num{font-family:var(--num);font-weight:var(--w,300);font-variation-settings:"wght" var(--w,300),"wdth" var(--wd,100);font-size:var(--fs);line-height:.92;display:flex;justify-content:center;color:var(--c,var(--ink));transform:translateY(var(--ty,0)) scale(var(--sc,1)) skewX(var(--sk,0deg));transform-origin:50% 80%;text-shadow:var(--ts,none);will-change:transform;font-kerning:none}
+.num b{display:block;width:.6em;text-align:center;font-weight:inherit}.num b.s{width:.26em}
+.num b.f{animation:flip .09s ease-out}
+@keyframes flip{from{transform:translateY(-14%);opacity:.35}}
+.num.inv{background:var(--ink);--c:#05070c;--ts:none;box-shadow:0 0 0 .06em var(--ink)}
+#ipw{--fs:clamp(74px,13vw,170px)}#ihr,#isp{--fs:clamp(34px,5.4vw,70px)}
+#ihr,#isp{padding-bottom:clamp(4px,1.6vw,22px)}
+#numrow{position:relative}
+#chev{position:absolute;left:100%;bottom:18%;margin-left:.5vw;display:flex;flex-direction:column-reverse;gap:3px}
+#chev i{display:block;width:12px;height:5px;clip-path:polygon(0 100%,50% 0,100% 100%,84% 100%,50% 34%,16% 100%);background:var(--faint)}
+#chev.dn{transform:scaleY(-1)}
+canvas.strip{display:block}
+#tape{width:min(460px,56vw);height:46px;margin-top:8px}
+#pips{display:flex;gap:3px;margin-top:6px}#pips i{display:block;width:clamp(6px,1.2vw,14px);height:2px;background:var(--faint)}
+#ecg{width:clamp(90px,13vw,150px);height:26px;margin-top:6px}#gbar{width:clamp(90px,13vw,150px);height:26px;margin-top:6px}
+/* ---------- panels ---------- */
+#panel,#rider{position:fixed;top:54px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;z-index:4;font-size:13px}
+#panel{right:max(16px,env(safe-area-inset-right,0px));width:min(290px,calc(100vw - 32px));max-height:calc(100vh - 80px);overflow:auto}
+#rider{left:max(16px,env(safe-area-inset-left,0px));width:min(290px,calc(100vw - 32px))}
+#panel h2{font:700 11px var(--mono);letter-spacing:.2em;margin:2px 0 10px;color:var(--dim)}
+.ctl{margin-bottom:12px}.ctl label{display:flex;justify-content:space-between;font:600 12px var(--body)}.ctl output{font:600 12px var(--mono);color:var(--amb)}
+small{display:block;color:var(--dim);font:500 11px/1.5 var(--body)}
+input[type=range]{width:100%;accent-color:var(--ink);margin:4px 0 0}
+input[type=number]{width:70px;font:600 14px var(--mono);color:#fff;background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:3px;padding:5px 6px}
+#presets,#zones{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}#zones button{flex:1;padding:8px 0}
+#copyout{width:100%;height:64px;font:11px var(--mono);background:#000;color:var(--cy);border:1px solid var(--line);margin-top:8px;display:none}
+kbd{font:600 11px var(--mono);border:1px solid var(--line);border-radius:3px;padding:1px 6px;color:#fff}
+#start{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:rgba(3,5,9,.94);padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow:auto}
+#start div{max-width:560px}
+#start h2{font:200 clamp(44px,8vw,96px)/.95 var(--num);letter-spacing:.04em;margin:0;text-wrap:balance}#start h2 b{font-weight:800}
+#start h3{font:600 12px var(--mono);letter-spacing:.34em;color:var(--dim);margin:14px 0 20px}
+#start p{color:var(--dim);font-size:15px;line-height:1.6;margin:0 0 12px;max-width:54ch}
+#go{font:700 13px var(--mono);letter-spacing:.3em;padding:15px 34px;background:var(--ink);color:#05070c;border:0;margin-top:12px;pointer-events:auto}
+[hidden]{display:none!important}
+@media (max-width:760px){#panel{top:auto;bottom:8px;max-height:40vh;left:16px;right:16px;width:auto}#hud{justify-content:center}}
+</style>
+<canvas id="bg"></canvas>
+<div id="bar"><h1>PEAK HOLD</h1><button id="bauto" class="on">Auto demo</button><button id="bman">Manual</button><span class="sp"></span><button id="bsnd">Sound on</button><button id="btune">Tuning</button></div>
+<div id="hud">
+  <div id="shift"></div>
+  <div id="cluster"><span class="br tl"></span><span class="br tr"></span><span class="br bl"></span><span class="br brr"></span>
+    <div class="inst" id="ihr"><div class="lab" id="hrlab">HEART</div><div class="num" id="nhr"></div><canvas class="strip" id="ecg"></canvas><div class="unit">BPM</div></div>
+    <div class="inst" id="ipw"><div class="lab" id="pwlab">Z1 · RECOVERY</div><div id="numrow"><div class="num" id="npw"></div><div id="chev"><i></i><i></i><i></i></div></div><canvas class="strip" id="tape"></canvas><div id="pips"></div><div class="unit">WATTS</div></div>
+    <div class="inst" id="isp"><div class="lab">SPEED</div><div class="num" id="nsp"></div><canvas class="strip" id="gbar"></canvas><div class="unit">KM/H</div></div>
+  </div>
+</div>
+<div id="rider" hidden>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"><label>FTP <input id="ftp" type="number" value="250" min="80" max="600"></label><label>Max HR <input id="hrmax" type="number" value="185" min="120" max="220"></label></div>
+  <label style="font:600 12px var(--body)">Effort: <span id="effv">55</span>% of FTP</label><input id="eff" type="range" min="30" max="200" value="55">
+  <div id="zones" style="margin-top:10px"><button data-p="50">Z1</button><button data-p="68">Z2</button><button data-p="85">Z3</button><button data-p="98">Z4</button><button data-p="113">Z5</button><button data-p="140">Z6</button></div>
+  <small>Keys <kbd>1</kbd>–<kbd>6</kbd> pick a zone. Hold <kbd>Space</kbd> to sprint. <kbd>A</kbd> returns to the auto demo.</small>
+</div>
+<div id="panel" hidden>
+  <h2>PRESETS</h2><div id="presets"><button data-k="restrained">Restrained</button><button data-k="standard" class="on">Standard</button><button data-k="aggressive">Aggressive</button></div>
+  <h2>TUNING</h2><div id="ctls"></div>
+  <button id="copy" style="pointer-events:auto">Copy these settings</button><textarea id="copyout" readonly></textarea>
+</div>
+<div id="start"><div>
+  <h2>PEAK <b>HOLD</b></h2><h3>OVERREACH · HUD CONCEPT</h3>
+  <p>Three numbers, each fixed in its place. They gain weight as effort rises, and each pedal stroke lands as a small strike.</p>
+  <p>The hairline above the power tape is your best of the last 30 seconds. Push through it and you carry it forward.</p>
+  <button id="go">START</button>
+</div></div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),lerp=(a,b,t)=>a+(b-a)*t,ss=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t)};
+const randn=()=>{let u=0;for(let i=0;i<4;i++)u+=Math.random();return (u-2)*1.73};
+/* ---------- settings ---------- */
+const CT=[['master','Overall intensity',0,1.5,.05,1,''],['onset','Wakes up at (% FTP)',50,110,1,76,'Below this the HUD stays thin and quiet'],['punch','Stroke strike',0,2,.05,1,'How hard each pedal stroke lands'],['load','Type weight under load',0,1.5,.05,1,'How much the numbers thicken and condense'],
+ ['twitch','Twitch at VO2 and above',0,2,.05,1,'Speed kick, overshoot and lean'],['stop','Hit-stop on a peak break (ms)',0,160,5,70,'A held frame when you break the hairline'],['tick','Stroke sound',0,1.5,.05,.8,''],['clack','Peak-break sound',0,1.5,.05,1,''],['engine','Engine sound',0,1.5,.05,.6,'']];
+const PRE={restrained:{master:.7,onset:86,punch:.6,load:.7,twitch:.6,stop:40,tick:.45,clack:.7,engine:.4},standard:{master:1,onset:76,punch:1,load:1,twitch:1,stop:70,tick:.8,clack:1,engine:.6},aggressive:{master:1.35,onset:68,punch:1.6,load:1.3,twitch:1.7,stop:110,tick:1.1,clack:1.3,engine:.9}};
+const SET=Object.assign({},PRE.standard);
+CT.forEach(c=>{const d=document.createElement('div');d.className='ctl';d.style.pointerEvents='auto';d.innerHTML=`<label>${c[1]}<output id="o_${c[0]}"></output></label><input type="range" id="s_${c[0]}" min="${c[2]}" max="${c[3]}" step="${c[4]}">`+(c[6]?`<small>${c[6]}</small>`:'');$('ctls').appendChild(d);
+  d.querySelector('input').addEventListener('input',e=>{SET[c[0]]=parseFloat(e.target.value);$('o_'+c[0]).textContent=SET[c[0]];document.querySelectorAll('#presets button').forEach(b=>b.classList.remove('on'));});});
+const syncCtl=()=>CT.forEach(c=>{$('s_'+c[0]).value=SET[c[0]];$('o_'+c[0]).textContent=SET[c[0]];});syncCtl();
+document.querySelectorAll('#presets button').forEach(b=>b.onclick=()=>{Object.assign(SET,PRE[b.dataset.k]);syncCtl();document.querySelectorAll('#presets button').forEach(x=>x.classList.toggle('on',x===b));});
+$('copy').onclick=()=>{const txt=JSON.stringify(SET),ok=()=>{$('copy').textContent='Copied';setTimeout(()=>$('copy').textContent='Copy these settings',1500)},fb=()=>{const t=$('copyout');t.style.display='block';t.value=txt;t.select();};try{navigator.clipboard.writeText(txt).then(ok,fb);}catch(e){fb();}};
+/* ---------- rider simulation ---------- */
+const R={mode:'auto',ftp:250,hrMax:185,hrRest:58,tgt:.55,P:130,cad:85,hr:95,phase:0,sprint:false,t:0};
+const SCRIPT=[[10,.55],[9,.8],[10,.96],[14,1.12],[6,.6],[9,1.25],[6,1.7],[12,.5]],SLEN=SCRIPT.reduce((a,s)=>a+s[0],0);
+const autoPct=t=>{let x=t%SLEN;for(const s of SCRIPT){if(x<s[0])return s[1];x-=s[0];}return .5;};
+const ZN=[[.55,'Z1 · RECOVERY'],[.75,'Z2 · ENDURANCE'],[.9,'Z3 · TEMPO'],[1.05,'Z4 · THRESHOLD'],[1.2,'Z5 · VO2 MAX'],[9,'Z6 · ANAEROBIC']];
+const zoneOf=p=>{for(const z of ZN)if(p<z[0])return z[1];return ZN[5][1];};
+/* ---------- feel state ---------- */
+const F={strokes:[],avg:0,pk30:0,pkRide:0,hold:0,pulse:0,hb:0,hbPhase:0,beats:[],v:120,vd:0,I:0,n:0,lastBreak:-9,carry:false,freeze:0,shock:9,shockX:0,inv:0,peakLab:0,jolt:0,gHist:[]};
+/* ---------- audio ---------- */
+let AC=null,soundOn=true;const A={};
+function audioInit(){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
+  A.master=AC.createGain();A.master.gain.value=.8;const c=AC.createDynamicsCompressor();c.threshold.value=-14;A.master.connect(c);c.connect(AC.destination);
+  A.engG=AC.createGain();A.engG.gain.value=0;A.engF=AC.createBiquadFilter();A.engF.type='lowpass';A.engF.frequency.value=250;A.engF.Q.value=1.5;A.engF.connect(A.engG);A.engG.connect(A.master);
+  A.osc=[1,1.502,.5].map((m,i)=>{const o=AC.createOscillator();o.type=i===2?'square':'sawtooth';const g=AC.createGain();g.gain.value=i===2?.3:.5;o.connect(g);g.connect(A.engF);o.start();return o;});
+  const nb=AC.createBuffer(1,AC.sampleRate,AC.sampleRate),d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;A.noise=nb;}
+function tone(type,f0,f1,dur,peak,delay=0){if(!AC||!soundOn||peak<=.001)return;const w=AC.currentTime+delay,o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f0,w);if(f1!==f0)o.frequency.exponentialRampToValueAtTime(f1,w+dur);
+  g.gain.setValueAtTime(.0001,w);g.gain.exponentialRampToValueAtTime(peak,w+.004);g.gain.exponentialRampToValueAtTime(.0001,w+dur);o.connect(g);g.connect(A.master);o.start(w);o.stop(w+dur+.05);}
+function click(peak,f,q=4,dur=.03){if(!AC||!soundOn||peak<=.001)return;const w=AC.currentTime,s=AC.createBufferSource();s.buffer=A.noise;const fl=AC.createBiquadFilter();fl.type='bandpass';fl.Q.value=q;fl.frequency.value=f;const g=AC.createGain();g.gain.setValueAtTime(peak,w);g.gain.exponentialRampToValueAtTime(.0001,w+dur);s.connect(fl);fl.connect(g);g.connect(A.master);s.start(w,Math.random()*.5);s.stop(w+dur+.02);}
+/* ---------- digits: fixed cells, changed digits flip ---------- */
+function setNum(el,str,noflip){const k=el.children;if(k.length!==str.length){el.textContent='';for(const ch of str){const b=document.createElement('b');b.textContent=ch;if(ch===','||ch==='.')b.className='s';el.appendChild(b);}return;}
+  for(let i=0;i<str.length;i++){const b=k[i];if(b.textContent!==str[i]){b.textContent=str[i];b.className=(str[i]===','||str[i]==='.')?'s':'';if(!noflip){void b.offsetWidth;b.classList.add('f');}}}}
+/* ---------- one pedal stroke ---------- */
+function stroke(now){
+  const w=Math.max(0,R.P*(1+.03*randn())),I=F.I,S=F.strokes;
+  const rec=S.filter(s=>now-s.t<=10),avg=rec.length>2?rec.reduce((a,s)=>a+s.w,0)/rec.length:w,prev30=S.filter(s=>now-s.t<=30).reduce((a,s)=>Math.max(a,s.w),0),ratio=w/Math.max(1,avg);
+  S.push({t:now,w});while(S.length&&now-S[0].t>40)S.shift();F.avg=avg;F.n++;
+  // strike
+  F.pulse=Math.min(1.6,(.3+.7*clamp((ratio-1)*8))*I*SET.punch+ .08);F.jolt=F.pulse*I;
+  F.vd+=(w-avg)/R.ftp*1300*I*SET.twitch;
+  setNum($('npw'),String(Math.round(w)));
+  const ch=$('chev'),n=ratio>1.1?3:ratio>1.05?2:ratio>1.02?1:ratio<.95?-1:0;ch.classList.toggle('dn',n<0);[...ch.children].forEach((e,i)=>e.style.background=i<Math.abs(n)?(n<0?'var(--dim)':I>.6?'var(--amb)':'var(--ink)'):'var(--faint)');
+  // hold: strokes that keep or beat the 10-second average
+  if(I>.15&&ratio>=.985)F.hold++;else{if(F.hold>=8)tone('sine',220,110,.16,.06*SET.tick);F.hold=0;}
+  // peak break: one event when you first push through the hairline, then you carry it quietly
+  const over=w>prev30*1.012&&S.length>14&&I>.12;
+  if(over&&!F.carry&&now-F.lastBreak>2.5){F.lastBreak=now;F.carry=true;const ride=w>F.pkRide&&now>15;F.freeze=SET.stop/1000;F.inv=.13;F.shock=0;F.shockX=w/R.ftp;F.jolt=1.5;if(ride)F.peakLab=1.6;
+    click(.5*SET.clack,2600,2,.05);tone('sine',1180,1180,.09,.16*SET.clack);tone('sine',1830,1830,.07,.1*SET.clack);tone('sine',120,42,.28,.5*SET.clack);if(ride){tone('sine',70,34,.6,.5*SET.clack,.02);click(.3*SET.clack,5200,1.5,.14);}}
+  else if(!over)F.carry=false;
+  if(w>F.pkRide)F.pkRide=w;F.pk30=Math.max(prev30,w);
+  // stroke sound: a dry mechanical tick that tightens and rises with load
+  click(.22*SET.tick*(.15+I),1400+2600*clamp(I)+700*clamp((ratio-1)*6),6,.022);if(I>.35)tone('sine',110+50*clamp((ratio-1)*6),60,.07,.2*SET.tick*I);
+}
+/* ---------- update ---------- */
+let spT=0;
+function update(dt,now){
+  R.t+=dt;if(R.mode==='auto')R.tgt=autoPct(R.t);const tg=R.sprint?Math.max(R.tgt,1.75):R.tgt;
+  R.P+=(tg*R.ftp-R.P)*(1-Math.exp(-dt/.55));R.P=Math.max(0,R.P+randn()*R.ftp*.004);const pct=R.P/R.ftp;
+  R.cad+=((80+24*clamp((pct-.5)/.9)+(pct>1.4?12:0))-R.cad)*(1-Math.exp(-dt/1.2));
+  const hrT=R.hrRest+(R.hrMax-R.hrRest)*clamp(.3+.56*pct,0,1.02);R.hr+=(hrT-R.hr)*(1-Math.exp(-dt/(hrT>R.hr?22:38)));
+  F.I=clamp(ss(SET.onset/100,1.22,pct)*SET.master,0,1.5);const I=Math.min(1,F.I);
+  R.phase+=R.cad/60*2*dt;if(R.phase>=1){R.phase-=1;stroke(now);}
+  const tw=I*SET.twitch,vT=90+900*Math.pow(pct,1.7),w0=lerp(1.3,8.5,clamp(tw)),zeta=lerp(1,.24,clamp(tw)),rev=pct>1.5?Math.sin(now*70)*60*SET.twitch:0;
+  F.vd+=(w0*w0*(vT-F.v)-2*zeta*w0*F.vd)*dt;F.v=Math.max(0,F.v+(F.vd+rev)*dt);
+  F.pulse*=Math.exp(-dt*15);F.jolt*=Math.exp(-dt*11);F.hb*=Math.exp(-dt*8);F.inv-=dt;F.shock+=dt;F.peakLab-=dt;
+  F.hbPhase+=R.hr/60*dt;if(F.hbPhase>=1){F.hbPhase-=1;F.hb=1;F.beats.push(now);if(F.beats.length>8)F.beats.shift();setNum($('nhr'),String(Math.round(R.hr)));if(F.I>.4){tone('sine',64,38,.1,.2*F.I);tone('sine',56,34,.09,.12*F.I,.13);}}
+  // 30 s hairline eases back down when the window moves on
+  const p30=F.strokes.filter(s=>now-s.t<=30).reduce((a,s)=>Math.max(a,s.w),0);F.pk30+=(p30-F.pk30)*(1-Math.exp(-dt*(p30>F.pk30?40:2.5)));
+  spT-=dt;if(spT<=0){spT=I>.55?.05:.12;const dec=I>.55;setNum($('nsp'),dec?F.v.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g,','):Math.round(F.v).toLocaleString('en-GB'),true);}
+  if(AC){const t=AC.currentTime,f=38+pct*62+F.v*.035,cut=pct>1.5&&Math.sin(now*70)>.3?.35:1;A.osc.forEach((o,i)=>o.frequency.setTargetAtTime(f*[1,1.502,.5][i],t,.05));A.engF.frequency.setTargetAtTime(170+1500*I*I+pct*220,t,.08);A.engG.gain.setTargetAtTime(soundOn?(.02+.12*I)*SET.engine*cut:0,t,.02);}
+}
+/* ---------- render ---------- */
+const bg=$('bg'),bx=bg.getContext('2d');let W=0,H=0,DPR=1;const STK=[];for(let i=0;i<220;i++)STK.push({a:Math.random()*6.283,z:Math.random(),r:.15+Math.random()*.85});
+const strips={};function fit(id){const c=$(id),r=c.getBoundingClientRect();c.width=Math.round(r.width*DPR);c.height=Math.round(r.height*DPR);strips[id]={c,x:c.getContext('2d'),w:r.width,h:r.height};}
+function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;bg.width=W*DPR;bg.height=H*DPR;['tape','ecg','gbar'].forEach(fit);}
+// shift bar and pips
+(function(){const sh=$('shift');for(let i=0;i<25;i++){const e=document.createElement('i');if(i===12)e.className='gap';sh.appendChild(e);}const p=$('pips');for(let i=0;i<16;i++)p.appendChild(document.createElement('i'));})();
+addEventListener('resize',resize);resize();
+const INK='233,241,247';
+function render(dt,now){
+  const pct=R.P/R.ftp,I=Math.min(1,F.I),load=clamp(I*SET.load,0,1.2),red=pct>1.5;
+  /* background: cool, quiet streaks */
+  bx.setTransform(DPR,0,0,DPR,0,0);bx.fillStyle=`rgba(4,6,10,${lerp(.9,.34,I)})`;bx.fillRect(0,0,W,H);const vx=W/2,vy=H*.4,spd=F.v/1000,R0=Math.hypot(W,H)*.6;bx.lineCap='round';
+  for(const s of STK){const z0=s.z;s.z-=dt*(.12+spd*1.8);if(s.z<=.02){s.z=1;s.a=Math.random()*6.283;continue;}const r0=R0*s.r*(1/z0-1)*.14,r1=R0*s.r*(1/s.z-1)*.14,ext=1+I*1.4*spd,c=Math.cos(s.a),sn=Math.sin(s.a);
+    bx.strokeStyle=`rgba(150,190,215,${clamp((1-s.z)*1.3)*(.12+.3*I)})`;bx.lineWidth=.6+1.6*(1-s.z);bx.beginPath();bx.moveTo(vx+c*r0,vy+sn*r0*.7);bx.lineTo(vx+c*(r0+(r1-r0)*ext),vy+sn*(r0+(r1-r0)*ext)*.7);bx.stroke();}
+  const vg=bx.createRadialGradient(W/2,H/2,Math.min(W,H)*.3,W/2,H/2,Math.max(W,H)*.75);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,`rgba(0,0,0,${.55+.25*I})`);bx.fillStyle=vg;bx.fillRect(0,0,W,H);
+  /* whole HUD: wakes with effort, jolts on strikes */
+  const hud=$('hud'),j=F.jolt*SET.punch;hud.style.opacity=lerp(.6,1,clamp(I*1.6));hud.style.transform=`translate(${(Math.random()-.5)*j*2.2+(red?Math.sin(now*70)*1.2:0)}px,${j*1.6}px)`;
+  $('cluster').style.setProperty('--in',lerp(0,9,I)+(red?Math.sin(now*70)*1.5:0)+'px');
+  /* power: weight, width and glow carry the load; the stroke is a strike */
+  const pw=$('npw'),pu=F.pulse,split=pu*2.2*I;
+  pw.style.setProperty('--w',Math.round(clamp(210+560*load+70*pu,100,900)));pw.style.setProperty('--wd',lerp(104,80,clamp(load)));pw.style.setProperty('--sc',1+.055*pu);pw.style.setProperty('--ty',pu*2.5+'px');
+  pw.style.setProperty('--c',red?'var(--red)':'var(--ink)');pw.style.setProperty('--ts',`0 0 ${8+26*I}px rgba(143,220,236,${.12+.4*I}),${split}px 0 rgba(255,74,74,${.55*clamp(pu*I)}),${-split}px 0 rgba(80,210,255,${.55*clamp(pu*I)})`);
+  pw.classList.toggle('inv',F.inv>0);
+  const lab=$('pwlab'),lt=F.peakLab>0?'RIDE PEAK':zoneOf(pct);if(lab.textContent!==lt)lab.textContent=lt;lab.style.color=F.peakLab>0?'var(--amb)':red?'var(--red)':I>.6?'var(--ink)':'var(--dim)';
+  /* heart */
+  const hf=clamp((R.hr-R.hrRest)/(R.hrMax-R.hrRest)),hr=$('nhr');hr.style.setProperty('--w',Math.round(220+520*hf*hf*SET.load));hr.style.setProperty('--sc',1+F.hb*(.012+.03*I));hr.style.setProperty('--c',hf>.93?'var(--red)':'var(--ink)');hr.style.setProperty('--ts',`0 0 ${6+14*hf}px rgba(255,120,130,${.1+.3*hf*hf})`);
+  const hl=hf>.93?'HEART · MAX':'HEART';if($('hrlab').textContent!==hl)$('hrlab').textContent=hl;
+  /* speed: leans and smears with acceleration */
+  const sp=$('nsp'),acc=clamp(F.vd/2600,-1,1);sp.style.setProperty('--w',Math.round(220+480*load));sp.style.setProperty('--sk',(-acc*9*I*SET.twitch).toFixed(2)+'deg');const sm=Math.abs(acc)*7*I*SET.twitch;
+  sp.style.setProperty('--ts',`${-Math.sign(acc)*sm}px 0 ${sm*.8}px rgba(${INK},${.35*clamp(Math.abs(acc)*I*2)}),0 0 ${6+16*I}px rgba(143,220,236,${.1+.3*I})`);
+  /* shift bar: converges on the centre */
+  const lit=clamp((pct-.6)/.8)*12,sh=$('shift').children,fl=red&&Math.sin(now*34)>0;for(let i=0;i<25;i++){if(i===12)continue;const d=i<12?i:24-i,on=fl||d<lit;sh[i].style.background=on?(d<6?'var(--ink)':d<10?'var(--amb)':'var(--red)'):'var(--faint)';sh[i].style.boxShadow=on&&I>.5?'0 0 8px currentColor':'none';}
+  const pips=$('pips').children,hn=Math.min(16,F.hold);for(let i=0;i<16;i++)pips[i].style.background=i<hn?(F.hold>16?(I>.6?'var(--amb)':'var(--ink)'):'var(--ink)'):'var(--faint)';
+  /* power tape with average notch and peak-hold hairlines */
+  {const s=strips.tape,x=s.x,w=s.w,h=s.h,MAXP=1.9,X=p=>clamp(p/MAXP)*w;x.setTransform(DPR,0,0,DPR,0,0);x.clearRect(0,0,w,h);const y=24;
+    x.fillStyle=`rgba(${INK},.16)`;x.fillRect(0,y,w,1);for(let p=0;p<=MAXP+.001;p+=.1){const maj=Math.abs(p-1)<.01||Math.abs(p-.5)<.01||Math.abs(p-1.5)<.01;x.fillRect(X(p),y-(maj?7:3),1,maj?7:3);}
+    x.fillStyle='rgba(255,74,74,.5)';x.fillRect(X(1.5),y+1,w-X(1.5),2);
+    x.fillStyle=red?'#ff4a4a':I>.6?'#ffb454':`rgb(${INK})`;x.shadowColor=x.fillStyle;x.shadowBlur=10*I;x.fillRect(0,y-1,X(pct),3+2*I);x.fillRect(X(pct)-1,y-9,2,14);x.shadowBlur=0;
+    const ax=X(F.avg/R.ftp);x.fillStyle=`rgba(${INK},.75)`;x.beginPath();x.moveTo(ax,y+7);x.lineTo(ax-4,y+14);x.lineTo(ax+4,y+14);x.fill();
+    const px=X(F.pk30/R.ftp);x.fillStyle=F.carry?'#ffb454':`rgba(${INK},.9)`;x.fillRect(px,2,1.5,y-2);x.font='600 8px ui-monospace,Menlo,monospace';x.textAlign='center';x.fillText('30',px,h-2 - 30<0?8:8);
+    const rx=X(F.pkRide/R.ftp);x.fillStyle=`rgba(${INK},.4)`;x.fillRect(rx,8,1,y-8);
+    x.fillStyle=`rgba(${INK},.5)`;x.textAlign='left';x.fillText('10 s',Math.min(w-22,ax+7),y+15);
+    if(F.shock<.45){const k=F.shock/.45,sx=X(F.shockX);x.fillStyle=`rgba(255,255,255,${(1-k)*.9})`;x.fillRect(sx-k*w*.5,y-12,k*w,1);x.fillRect(sx-1,0,2,h*(1-k));}}
+  /* ECG strip */
+  {const s=strips.ecg,x=s.x,w=s.w,h=s.h;x.setTransform(DPR,0,0,DPR,0,0);x.clearRect(0,0,w,h);x.strokeStyle=hf>.93?'#ff4a4a':`rgba(${INK},${.45+.5*hf})`;x.lineWidth=1.2;x.beginPath();const pps=62;
+    for(let px=0;px<=w;px+=1.5){const t=now-(w-px)/pps;let yv=0;for(const b of F.beats){const d=t-b;if(d>=0&&d<.22){const u=d/.22;yv+=u<.18?-.15*Math.sin(u/.18*Math.PI):u<.3?-1*Math.sin((u-.18)/.12*Math.PI):u<.42?.45*Math.sin((u-.3)/.12*Math.PI):u>.6&&u<.9?-.2*Math.sin((u-.6)/.3*Math.PI):0;}}
+      const yy=h*.62+yv*h*.5*(.6+.5*hf);px?x.lineTo(px,yy):x.moveTo(px,yy);}x.stroke();}
+  /* acceleration bar */
+  {const s=strips.gbar,x=s.x,w=s.w,h=s.h;x.setTransform(DPR,0,0,DPR,0,0);x.clearRect(0,0,w,h);const y=12;x.fillStyle=`rgba(${INK},.16)`;x.fillRect(0,y,w,1);x.fillStyle=`rgba(${INK},.5)`;x.fillRect(w/2,y-5,1,11);
+    F.gHist.push(acc);if(F.gHist.length>10)F.gHist.shift();F.gHist.forEach((a,i)=>{const k=(i+1)/F.gHist.length;x.fillStyle=`rgba(${INK},${k*k*(i===F.gHist.length-1?1:.3)})`;x.fillRect(w/2+a*w*.46-1,y-6,2,13);});
+    x.fillStyle=`rgba(${INK},.5)`;x.font='600 8px ui-monospace,Menlo,monospace';x.textAlign='left';x.fillText('−',1,h-1);x.textAlign='right';x.fillText('+',w-1,h-1);}
+}
+/* ---------- loop + controls ---------- */
+let last=0,running=false;
+function frame(ms){requestAnimationFrame(frame);const now=ms/1000,dt=Math.min(.05,now-last||0);last=now;if(running){if(F.freeze>0)F.freeze-=dt;else update(dt,now);}render(F.freeze>0?0:dt,now);if(R.mode==='auto'){$('eff').value=Math.round(R.tgt*100);$('effv').textContent=Math.round(R.tgt*100);}}
+function setMode(m){R.mode=m;$('bauto').classList.toggle('on',m==='auto');$('bman').classList.toggle('on',m==='manual');$('rider').hidden=m!=='manual';}
+function setEff(p){R.tgt=p/100;$('eff').value=p;$('effv').textContent=p;setMode('manual');}
+$('bauto').onclick=()=>setMode('auto');$('bman').onclick=()=>setMode('manual');$('eff').addEventListener('input',e=>setEff(parseInt(e.target.value,10)));
+document.querySelectorAll('#zones button').forEach(b=>b.onclick=()=>setEff(parseInt(b.dataset.p,10)));
+$('ftp').addEventListener('change',e=>R.ftp=clamp(parseInt(e.target.value,10)||250,80,600));$('hrmax').addEventListener('change',e=>R.hrMax=clamp(parseInt(e.target.value,10)||185,120,220));
+$('btune').onclick=()=>{$('panel').hidden=!$('panel').hidden;$('btune').classList.toggle('on',!$('panel').hidden);};
+$('bsnd').onclick=()=>{soundOn=!soundOn;$('bsnd').textContent=soundOn?'Sound on':'Sound off';};
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;const k=e.key.toLowerCase();if(k===' '){e.preventDefault();R.sprint=true;}else if(k>='1'&&k<='6')setEff([50,68,85,98,113,140][k-1]);else if(k==='a')setMode('auto');else if(k==='t')$('btune').click();});
+addEventListener('keyup',e=>{if(e.key===' ')R.sprint=false;});
+$('go').onclick=()=>{audioInit();$('start').hidden=true;running=true;};
+setNum($('npw'),'130');setNum($('nhr'),'95');setNum($('nsp'),'120');
+window.LAB={R,F,SET,setEff,go:()=>$('go').click()};requestAnimationFrame(frame);
+</script>

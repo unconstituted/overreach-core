@@ -1,0 +1,174 @@
+<title>Overreach Visor HUD</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@50..125,100..900&display=swap">
+<style>
+:root{color-scheme:dark;--bg:#02040a;--holo:#8ff3ff;--holo-rgb:143,243,255;--core:#f2feff;--warm:#ffc27a;--hot:#ff6a5c;--ui:rgba(8,12,20,.82);--uiline:rgba(255,255,255,.16);--uifg:#e9f2f7;
+ --wide:"Saira","Eurostile Extended","Microgramma","Avenir Next",sans-serif;--body:-apple-system,"Helvetica Neue",Arial,sans-serif}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--uifg);font-family:var(--body);overflow:hidden}
+/* ---------- the world ---------- */
+#scene{position:fixed;inset:-3%;overflow:hidden}
+#scene img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;max-width:none;opacity:0;transition:opacity 1.2s;will-change:transform}
+#scene img.on{opacity:1}
+#streaks{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+/* the visor itself: curved rim, glass tint, reflections */
+#visor{position:fixed;inset:0;pointer-events:none}
+#visor::before{content:"";position:absolute;inset:0;background:radial-gradient(130% 110% at 50% 58%,transparent 58%,rgba(0,4,10,.55) 82%,rgba(0,2,6,.95) 100%)}
+#visor::after{content:"";position:absolute;left:-10%;right:-10%;top:-40%;height:70%;border-radius:50%;background:linear-gradient(180deg,rgba(170,230,255,.07),transparent 60%);transform:rotate(-4deg)}
+#glass{position:fixed;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(200,240,255,.035) 42%,transparent 50%),linear-gradient(180deg,rgba(40,90,110,.12),transparent 30%,transparent 70%,rgba(40,90,110,.12))}
+/* ---------- projection layer ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;mix-blend-mode:screen;perspective:70vw}
+#hud.alert{--holo:#ffc27a;--holo-rgb:255,194,122}
+#hud.danger{--holo:#ff7a6a;--holo-rgb:255,122,106}
+.holo{color:var(--core);text-shadow:0 0 1px rgba(255,255,255,.9),0 0 .12em rgba(var(--holo-rgb),.95),0 0 .35em rgba(var(--holo-rgb),.6),0 0 .9em rgba(var(--holo-rgb),.32),.035em 0 .02em rgba(255,90,140,.25),-.035em 0 .02em rgba(90,200,255,.3)}
+.wide{font-family:var(--wide);font-variation-settings:"wght" 520,"wdth" 125;font-weight:520;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#arc{position:absolute;left:0;top:0;width:100%;height:24vw;overflow:visible}
+#hud.bot #arc{top:auto;bottom:0;transform:scaleY(-1)}
+.cl{position:absolute;top:4.4vw;transform-style:preserve-3d;display:flex;flex-direction:column}
+#L{left:5.5vw;transform-origin:0 0;transform:rotateY(22deg) rotateZ(3deg) skewX(-9deg)}
+#R{right:6.5vw;transform-origin:100% 0;transform:rotateY(-22deg) rotateZ(-3deg) skewX(-9deg);text-align:right;align-items:flex-end}
+#hud.bot .cl{top:auto;bottom:4.6vw;flex-direction:column-reverse}#hud.bot .rule{margin:0 0 1.1vw}#hud.bot .row{margin:0 0 1.3vw}#hud.bot .lab{margin-top:.6vw}#hud.bot .big{margin-top:0!important}
+#hud.bot #L{transform-origin:0 100%;transform:rotateY(22deg) rotateZ(-3deg) skewX(-9deg)}
+#hud.bot #R{transform-origin:100% 100%;transform:rotateY(-22deg) rotateZ(3deg) skewX(-9deg)}
+.big{font-size:6.6vw;line-height:.86;white-space:nowrap}
+.big i{font-style:normal;font-size:.42em;margin-left:.18em;font-variation-settings:"wght" 420,"wdth" 125}
+.mid{font-size:1.55vw;line-height:1;white-space:nowrap}
+.mid small{font-size:.52em;letter-spacing:.14em;margin-left:.35em;opacity:.8;font-variation-settings:"wght" 500,"wdth" 125}
+.lab{font-size:.68vw;letter-spacing:.32em;opacity:.7;white-space:nowrap;font-variation-settings:"wght" 560,"wdth" 125}
+.row{display:flex;gap:2.4vw;margin-top:1.4vw;align-items:baseline}
+#R .row{justify-content:flex-end}
+.rule{position:relative;height:2px;margin-top:1.1vw;width:21vw;background:linear-gradient(90deg,rgba(var(--holo-rgb),.0),rgba(var(--holo-rgb),.35) 12%,rgba(var(--holo-rgb),.35) 88%,rgba(var(--holo-rgb),0));box-shadow:0 0 8px rgba(var(--holo-rgb),.4)}
+#R .rule{margin-left:auto}
+.rule b{position:absolute;top:-1px;height:4px;background:var(--core);box-shadow:0 0 6px rgba(var(--holo-rgb),1),0 0 16px rgba(var(--holo-rgb),.7)}
+.rule em{position:absolute;top:-7px;width:2px;height:16px;background:var(--core);box-shadow:0 0 8px rgba(var(--holo-rgb),1)}
+.rule s{position:absolute;top:-4px;width:1px;height:10px;background:rgba(var(--holo-rgb),.6)}
+/* centre: comms and notices along the arc */
+#C{position:absolute;left:50%;top:7.4vw;transform:translateX(-50%);text-align:center;transition:opacity .6s,filter .6s}
+#hud.bot #C{top:auto;bottom:8.6vw}
+#C.off{opacity:0;filter:blur(6px)}
+#ct{font-size:.72vw;letter-spacing:.42em}
+#cs{font-size:1.25vw;margin-top:.55vw;letter-spacing:.1em;font-variation-settings:"wght" 460,"wdth" 118}
+#wave{display:block;margin:.5vw auto 0;width:16vw;height:2.2vw;overflow:visible}
+/* flicker on change */
+.tick{animation:tk .14s steps(2)}
+@keyframes tk{50%{opacity:.55}}
+/* boot */
+#hud.boot .cl,#hud.boot #arc{animation:on 1.6s cubic-bezier(.2,.8,.2,1) both}
+#hud.boot #R{animation-delay:.25s}#hud.boot #arc{animation-delay:.05s}
+@keyframes on{0%{opacity:0;filter:blur(14px)}40%{opacity:.9;filter:blur(2px)}48%{opacity:.25}56%{opacity:1;filter:blur(0)}100%{opacity:1}}
+/* ---------- design-review controls (not part of the HUD) ---------- */
+#ctl{position:fixed;left:0;right:0;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:5;transition:opacity .4s}
+#ctl.top{top:0}#ctl.bot{bottom:0}
+body.idle #ctl{opacity:0}
+.grp{display:flex;align-items:center;border:1px solid var(--uiline);border-radius:999px;overflow:hidden;background:var(--ui);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.grp span{font:600 10px var(--body);letter-spacing:.14em;color:rgba(233,242,247,.55);padding:0 8px 0 14px}
+button{font:600 12px var(--body);color:var(--uifg);background:none;border:0;padding:9px 13px;cursor:pointer;border-radius:999px}
+button:hover{background:rgba(255,255,255,.08)}button.on{background:var(--uifg);color:#06080d}
+#eff{width:110px;accent-color:var(--uifg);margin:0 12px 0 4px}
+</style>
+<div id="scene"><img id="b0" class="on" alt="" src="__BG0__"><img id="b1" alt="" src="__BG1__"><img id="b2" alt="" src="__BG2__"></div>
+<canvas id="streaks"></canvas>
+<div id="glass"></div>
+<div id="visor"></div>
+<div id="hud" class="top boot">
+  <svg id="arc" viewBox="0 0 1600 380" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="rgb(143,243,255)" stop-opacity="0"/><stop offset=".14" stop-color="rgb(143,243,255)" stop-opacity=".75"/><stop offset=".5" stop-color="rgb(230,252,255)" stop-opacity=".95"/><stop offset=".86" stop-color="rgb(143,243,255)" stop-opacity=".75"/><stop offset="1" stop-color="rgb(143,243,255)" stop-opacity="0"/></linearGradient>
+      <filter id="bloom" x="-5%" y="-50%" width="110%" height="200%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <path id="rim" d="M80 34 Q800 150 1520 34" fill="none" stroke="url(#fade)" stroke-width="1.6" filter="url(#bloom)" vector-effect="non-scaling-stroke"/>
+    <path d="M150 50 Q800 166 1450 50" fill="none" stroke="url(#fade)" stroke-width="1" opacity=".28" vector-effect="non-scaling-stroke"/>
+    <path id="prog" d="M80 34 Q800 150 1520 34" fill="none" stroke="#f2feff" stroke-width="3.2" pathLength="1" stroke-dasharray="0 1" filter="url(#bloom)" vector-effect="non-scaling-stroke"/>
+    <g id="ticks"></g>
+  </svg>
+  <div class="cl" id="L">
+    <div class="lab holo wide" id="zl">ZONE 2 · ENDURANCE</div>
+    <div class="big holo wide" style="margin-top:.5vw"><span id="pw">320</span><i>W</i></div>
+    <div class="rule" id="prule"><s style="left:52.6%"></s><b id="pbar" style="left:0;width:30%"></b><em id="ptgt" style="left:40%"></em></div>
+    <div class="row">
+      <div class="mid holo wide"><span id="hr">142</span><small>BPM</small></div>
+      <div class="mid holo wide"><span id="cad">92</span><small>RPM</small></div>
+      <div class="mid holo wide" style="opacity:.75"><span id="tg">TGT 325</span></div>
+    </div>
+  </div>
+  <div class="cl" id="R">
+    <div class="lab holo wide" id="sl">VELOCITY · KM/H</div>
+    <div class="big holo wide" style="margin-top:.5vw"><span id="sp">86</span></div>
+    <div class="rule"><b id="abar" style="left:50%;width:0"></b><em style="left:50%;opacity:.5"></em></div>
+    <div class="row">
+      <div class="mid holo wide" style="opacity:.75"><span id="nav">212°</span></div>
+      <div class="mid holo wide"><span id="dist">30.4</span><small>KM</small></div>
+      <div class="mid holo wide"><span id="eta">00:55</span><small>ETA</small></div>
+    </div>
+  </div>
+  <div id="C" class="off"><div id="ct" class="holo wide">SHIP AI</div><div id="cs" class="holo wide">Beautiful, isn’t it?</div><svg id="wave" viewBox="0 0 320 44"><polyline id="wl" fill="none" stroke="#f2feff" stroke-width="1.4" points="" style="filter:drop-shadow(0 0 4px rgb(143,243,255))"/></svg></div>
+</div>
+<div id="ctl" class="bot">
+  <div class="grp"><span>HUD</span><button data-p="top" class="on">Top</button><button data-p="bot">Bottom</button></div>
+  <div class="grp"><span>SCENE</span><button data-s="0" class="on">Frozen wave</button><button data-s="1">Storm</button><button data-s="2">Station</button></div>
+  <div class="grp"><span>EFFORT</span><button id="auto" class="on">Auto</button><input id="eff" type="range" min="40" max="180" value="70" aria-label="Effort, percent of FTP"></div>
+  <div class="grp"><button id="popn">Next notice</button><button id="reboot">Replay boot</button></div>
+</div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),lerp=(a,b,t)=>a+(b-a)*t,ss=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t)};
+const randn=()=>{let u=0;for(let i=0;i<4;i++)u+=Math.random();return (u-2)*1.73},pad=(n,k=2)=>String(n).padStart(k,'0');
+/* ---------- simulated rider ---------- */
+const D={ftp:250,hrMax:185,hrRest:58,tgt:.7,P:175,cad:86,hr:120,v:300,vd:0,acc:0,t:582,hdg:212,dist:38.2,auto:true,avg10:175};
+const SCRIPT=[[9,.6],[9,.78],[9,.95],[12,1.12],[6,.62],[8,1.28],[5,1.65],[10,.52]],SLEN=SCRIPT.reduce((a,s)=>a+s[0],0);
+const ZN=[[.55,'ZONE 1 · RECOVERY'],[.75,'ZONE 2 · ENDURANCE'],[.9,'ZONE 3 · TEMPO'],[1.05,'ZONE 4 · THRESHOLD'],[1.2,'ZONE 5 · VO2 MAX'],[9,'ZONE 6 · ANAEROBIC']];
+const zi=p=>{for(let i=0;i<6;i++)if(p<ZN[i][0])return i;return 5;};
+const NOTES=[{t:'',s:''},{t:'LOCATION',s:'Meridian Station · Race Corridor 3'},{t:'SHIP AI',s:'Beautiful, isn’t it?',ai:1},{t:'SURGE IN 5',s:'115% · 20 seconds · ERG off',c:'alert'},{t:'',s:''},{t:'WARNING',s:'Pilot input rejected',c:'danger'}];
+let ni=0,nt=0,strokes=[];
+function sim(dt,now){
+  D.t+=dt;if(D.auto){let x=D.t%SLEN;for(const s of SCRIPT){if(x<s[0]){D.tgt=s[1];break;}x-=s[0];}}
+  D.P+=(D.tgt*D.ftp-D.P)*(1-Math.exp(-dt/.6));D.P=Math.max(0,D.P+randn()*1.2);const pct=D.P/D.ftp;
+  D.cad+=((80+24*clamp((pct-.5)/.9))-D.cad)*(1-Math.exp(-dt/1.2));
+  const hrT=D.hrRest+(D.hrMax-D.hrRest)*clamp(.3+.56*pct,0,1.02);D.hr+=(hrT-D.hr)*(1-Math.exp(-dt/(hrT>D.hr?20:34)));
+  const vT=90+900*Math.pow(pct,1.7),I=ss(.76,1.2,pct),w0=lerp(1.3,7,I),z=lerp(1,.3,I);D.vd+=(w0*w0*(vT-D.v)-2*z*w0*D.vd)*dt;D.v=Math.max(0,D.v+D.vd*dt);D.acc=clamp(D.vd/2600,-1,1);
+  strokes.push([now,D.P]);while(strokes.length&&now-strokes[0][0]>10)strokes.shift();D.avg10=strokes.reduce((a,s)=>a+s[1],0)/strokes.length;
+  D.hdg=(212+18*Math.sin(D.t*.05)+360)%360;D.dist=Math.max(.4,D.dist-D.v*dt/3600*6);if(D.dist<=.5)D.dist=38.2;
+  nt+=dt;if(nt>5.5){nt=0;ni=(ni+1)%NOTES.length;}
+}
+/* ---------- arc ticks: points along the visor rim ---------- */
+const Qp=(t)=>[(1-t)*(1-t)*80+2*(1-t)*t*800+t*t*1520,(1-t)*(1-t)*34+2*(1-t)*t*150+t*t*34];
+(function(){let s='';for(let i=1;i<40;i++){const t=i/40,[x,y]=Qp(t),maj=i%5===0,len=maj?14:6,al=Math.sin(t*Math.PI);s+=`<line x1="${x}" y1="${y+3}" x2="${x}" y2="${y+3+len}" stroke="rgb(143,243,255)" stroke-opacity="${(maj?.55:.25)*al}" vector-effect="non-scaling-stroke"/>`;}$('ticks').innerHTML=s;})();
+/* ---------- update ---------- */
+const T=(id,v)=>{const e=$(id);if(e.textContent!==v){e.textContent=v;e.classList.remove('tick');void e.offsetWidth;e.classList.add('tick');}};
+function update(now){
+  const pct=D.P/D.ftp,z=zi(pct);
+  T('pw',String(Math.round(D.P)));T('hr',String(Math.round(D.hr)));T('cad',String(Math.round(D.cad)));T('tg','TGT '+Math.round(D.tgt*D.ftp));
+  $('zl').textContent=ZN[z][1];
+  $('pbar').style.width=clamp(pct/1.9)*100+'%';$('ptgt').style.left=clamp(D.tgt/1.9)*100+'%';
+  T('sp',Math.round(D.v).toLocaleString('en-GB'));T('nav',pad(Math.round(D.hdg),3)+'°');T('dist',D.dist.toFixed(1));
+  const eta=D.dist/Math.max(1,D.v*6)*3600;T('eta',pad(Math.floor(eta/60)%60)+':'+pad(Math.floor(eta%60)));
+  const a=D.acc*50;$('abar').style.left=(a<0?50+a:50)+'%';$('abar').style.width=Math.abs(a)+'%';
+  $('prog').setAttribute('stroke-dasharray',`${(D.t%2100)/2100} 1`);
+  const n=NOTES[ni],hud=$('hud');$('C').classList.toggle('off',!n.t);if(n.t){$('ct').textContent=n.t;$('cs').textContent=n.s;}
+  hud.classList.toggle('alert',(n.c==='alert'&&!!n.t)||(z===4));hud.classList.toggle('danger',(n.c==='danger'&&!!n.t)||z>=5);
+  let w='';for(let x=0;x<=320;x+=4){const env=Math.sin(x/320*Math.PI),amp=n.ai?env*(6+14*Math.abs(Math.sin(now*7+x*.05)*Math.sin(now*2.3+x*.013))):env*1.2;w+=x+','+(22+Math.sin(x*.18+now*(n.ai?14:3))*amp).toFixed(1)+' ';}
+  $('wl').setAttribute('points',w);$('wave').style.opacity=n.ai?1:.35;
+}
+/* ---------- the world moves ---------- */
+const cv=$('streaks'),cx=cv.getContext('2d');let W=0,H=0,DPR=1;const ST=[];for(let i=0;i<160;i++)ST.push({a:Math.random()*6.283,z:Math.random(),r:.2+Math.random()*.8});
+function resize(){DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;}addEventListener('resize',resize);resize();
+let pos='top',scene=0;const FOC=[[.5,.62],[.62,.5],[.45,.45]];
+function world(dt,now){
+  const spd=D.v/1000,shake=ss(1,1.6,D.P/D.ftp)*2.2,img=$('b'+scene),f=FOC[scene];
+  img.style.transform=`translate(${(Math.random()-.5)*shake}px,${(Math.random()-.5)*shake}px) scale(${1.04+.03*Math.sin(now*.05)+spd*.012})`;img.style.transformOrigin=f[0]*100+'% '+f[1]*100+'%';
+  cx.setTransform(DPR,0,0,DPR,0,0);cx.clearRect(0,0,W,H);const vx=W*f[0],vy=H*f[1],R0=Math.hypot(W,H)*.6;cx.lineCap='round';
+  for(const s of ST){const z0=s.z;s.z-=dt*(.1+spd*1.5);if(s.z<=.02){s.z=1;s.a=Math.random()*6.283;continue;}const r0=R0*s.r*(1/z0-1)*.14,r1=R0*s.r*(1/s.z-1)*.14,c=Math.cos(s.a),sn=Math.sin(s.a),e=1+spd*.5;
+    cx.strokeStyle=`rgba(235,248,255,${clamp((1-s.z)*1.2)*(.03+.11*clamp(spd))})`;cx.lineWidth=.5+1.4*(1-s.z);cx.beginPath();cx.moveTo(vx+c*r0,vy+sn*r0*.7);cx.lineTo(vx+c*(r0+(r1-r0)*e),vy+sn*(r0+(r1-r0)*e)*.7);cx.stroke();}
+}
+/* ---------- controls ---------- */
+function place(){$('hud').classList.toggle('top',pos==='top');$('hud').classList.toggle('bot',pos==='bot');$('ctl').className=pos==='top'?'bot':'top';}
+function boot(){const h=$('hud');h.classList.remove('boot');void h.offsetWidth;h.classList.add('boot');}
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{pos=b.dataset.p;document.querySelectorAll('[data-p]').forEach(x=>x.classList.toggle('on',x===b));place();boot();});
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{scene=+b.dataset.s;document.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));for(let i=0;i<3;i++)$('b'+i).classList.toggle('on',i===scene);});
+$('auto').onclick=()=>{D.auto=!D.auto;$('auto').classList.toggle('on',D.auto);};$('eff').addEventListener('input',e=>{D.auto=false;$('auto').classList.remove('on');D.tgt=parseInt(e.target.value,10)/100;});
+$('popn').onclick=()=>{ni=(ni+1)%NOTES.length;nt=0;};$('reboot').onclick=boot;
+let idle=0;const wake=()=>{document.body.classList.remove('idle');clearTimeout(idle);idle=setTimeout(()=>document.body.classList.add('idle'),3500);};addEventListener('mousemove',wake);addEventListener('touchstart',wake);wake();
+/* ---------- loop ---------- */
+let last=0,acc=0;function frame(ms){requestAnimationFrame(frame);const now=ms/1000,dt=Math.min(.05,now-last||0);last=now;sim(dt,now);world(dt,now);acc+=dt;if(acc>.05){acc=0;update(now);}}
+requestAnimationFrame(frame);window.V={D,setPos:p=>{pos=p;place();},setScene:s=>document.querySelector(`[data-s="${s}"]`).click(),note:i=>{ni=i;nt=0;}};
+</script>
