@@ -730,6 +730,27 @@
                 ],
                 "additionalProperties": false
               }
+            },
+            "pace": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Fraction of threshold running pace, as a speed (1.0 = threshold, 1.05 = 5% faster)."
+            },
+            "secPerKm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Absolute running pace, seconds per kilometre (300 = 5:00 /km)."
+            },
+            "hr": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1.1,
+              "description": "Fraction of maximum heart rate."
+            },
+            "bpm": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Heart rate, beats per minute."
             }
           },
           "required": [
@@ -757,8 +778,13 @@
             "unit": {
               "enum": [
                 "ftp",
-                "watts"
-              ]
+                "watts",
+                "pace",
+                "speed",
+                "hr",
+                "bpm"
+              ],
+              "description": "Unit of from and to: ftp (fraction of FTP), watts, pace (fraction of threshold pace), speed (m/s), hr (fraction of max heart rate) or bpm. Defaults to pace in a run workout, ftp otherwise."
             },
             "cadence": {
               "type": "number"
@@ -894,6 +920,27 @@
                 },
                 "label": {
                   "type": "string"
+                },
+                "pace": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Fraction of threshold running pace, as a speed (1.0 = threshold, 1.05 = 5% faster)."
+                },
+                "secPerKm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Absolute running pace, seconds per kilometre (300 = 5:00 /km)."
+                },
+                "hr": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1.1,
+                  "description": "Fraction of maximum heart rate."
+                },
+                "bpm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Heart rate, beats per minute."
                 }
               },
               "required": [
@@ -920,6 +967,27 @@
                 },
                 "label": {
                   "type": "string"
+                },
+                "pace": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Fraction of threshold running pace, as a speed (1.0 = threshold, 1.05 = 5% faster)."
+                },
+                "secPerKm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Absolute running pace, seconds per kilometre (300 = 5:00 /km)."
+                },
+                "hr": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 1.1,
+                  "description": "Fraction of maximum heart rate."
+                },
+                "bpm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Heart rate, beats per minute."
                 }
               },
               "required": [

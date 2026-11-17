@@ -8,6 +8,7 @@
 import type { ActiveWidget, Chapter, ChapterRuntime, ChapterState, Still } from '../../core/chapter';
 import type { FeelConfig, FeelState } from '../../core/feel';
 import { powerZone, POWER_ZONE_NAMES } from '../../core/record';
+import { effortOf, formatPace, hrToEffort, paceToEffort, type TargetKind } from '../../core/workout';
 import { clamp, lerp, smoothstep as ss } from '../../core/util/math';
 import { hash, hash2, noise1 } from '../../core/util/noise';
 
@@ -31,6 +32,16 @@ export interface StageFrame {
   showSubtitles: boolean;
   /** Transient centre notice from the app (step changes and the like). */
   flash?: { title: string; text: string; tone?: 'alert' | 'danger' };
+  /** Present when running: pace replaces power as the hero number. */
+  run?: {
+    /** Runner's speed, m/s. */
+    speed: number;
+    /** FTP-equivalent effort (see `workout/effort.ts`). */
+    effort: number;
+    units: 'metric' | 'imperial';
+    /** False when the runner sets the belt themselves. */
+    control: boolean;
+  };
 }
 
 const ZONE_COLOURS = ['#8b95b5', '#6ec8ff', '#6fe3b4', '#ffd166', '#ff9f43', '#ff4d6d', '#ff4d6d'];
@@ -61,11 +72,11 @@ const HTML = `
   </svg>
   <div class="cl" id="L">
     <div class="lab holo wide" id="zl">ZONE 1 · RECOVERY</div>
-    <div class="big holo wide" id="pwrow"><span id="pwn">0</span><i>W</i><span id="chev"><i></i><i></i><i></i></span></div>
+    <div class="big holo wide" id="pwrow"><span id="pwn">0</span><i id="pwu">W</i><span id="chev"><i></i><i></i><i></i></span></div>
     <div class="rule" id="prule"><s style="left:52.6%"></s><b id="pbar" style="left:0;width:0"></b><em id="ptgt" style="left:40%"></em><u id="ppk" style="left:0"></u></div>
     <div class="row">
       <div class="mid holo wide" id="hrbox"><span id="hr">0</span><small>BPM</small></div>
-      <div class="mid holo wide" id="cadbox"><span id="cad">0</span><small>RPM</small></div>
+      <div class="mid holo wide" id="cadbox"><span id="cad">0</span><small id="cadu">RPM</small></div>
       <div class="mid holo wide" id="tgbox" style="opacity:.75"><span id="tg">TGT 0</span></div>
     </div>
   </div>
@@ -125,6 +136,7 @@ export class Stage {
   private hudPos: 'top' | 'bot' = 'top';
   private toastTimer = 0;
   private dispPower = 0;
+  private dispSpeed = 0;
 
   constructor(readonly root: HTMLElement, private readonly rt: ChapterRuntime, private readonly imageBase: string, onSeek: (t: number) => void) {
     root.innerHTML = HTML;
@@ -219,10 +231,11 @@ export class Stage {
     const x = c.getContext('2d') as CanvasRenderingContext2D;
     const W = c.width = Math.max(2, c.clientWidth * 2); const H = c.height = Math.max(2, c.clientHeight * 2);
     x.clearRect(0, 0, W, H);
-    const { runner } = this.rt; const total = runner.total; const ftp = runner.ftp;
+    const { runner } = this.rt; const total = runner.total;
     runner.workout.steps.forEach((s, i) => {
       const x0 = (runner.starts[i] / total) * W; const x1 = (runner.starts[i + 1] / total) * W;
-      const f = (v: number) => (s.target?.unit === 'watts' ? v / ftp : v);
+      // Bars are drawn as effort, so a run and a ride of the same session look the same.
+      const f = (v: number) => (s.target ? effortOf(v, s.target.unit, runner.thresholds) : v);
       const p0 = s.target ? f(s.target.from) : 0.35; const p1 = s.target ? f(s.target.to) : 0.35;
       x.fillStyle = s.target ? zoneColour(Math.max(p0, p1)) : 'rgba(255,255,255,.25)';
       x.globalAlpha = 0.85;
@@ -303,14 +316,25 @@ export class Stage {
     const j = on ? feel.jolt * f.feelConfig.punch : 0;
     hud.style.transform = fx('tear') ? '' : `translate(${(Math.random() - 0.5) * j * 2.2 + (feel.redline && on ? Math.sin(f.now * 70) * 1.2 : 0)}px,${(this.hudPos === 'top' ? 1 : -1) * j * 1.6}px)`;
 
-    /* ----- left cluster: power ----- */
-    const pct = f.rider.power / f.ftp;
-    const zone = powerZone(f.rider.power, f.ftp) - 1;
-    // With the feel layer on, the number shows each stroke; otherwise a lightly smoothed reading.
-    this.dispPower += (f.rider.power - this.dispPower) * (1 - Math.exp(-f.dt / 0.25));
-    const shownPower = on && f.rider.cadence > 20 ? feel.strokeWatts : this.dispPower;
+    /* ----- left cluster: power, or pace when running ----- */
+    const run = f.run;
+    const pct = run ? run.effort : f.rider.power / f.ftp;
+    const zone = powerZone(pct * 100, 100) - 1;
     const showPw = !hidden('power'); const showCad = !hidden('cadence'); const showHr = !hidden('heartRate');
-    this.T('pwn', showPw ? String(Math.round(shownPower)) : '—');
+    if (run) {
+      // Belt speed is smooth already; a little more smoothing keeps the pace from flickering between seconds.
+      this.dispSpeed += (run.speed - this.dispSpeed) * (1 - Math.exp(-f.dt / 0.6));
+      this.T('pwn', showPw ? formatPace(this.dispSpeed, run.units) : '—');
+      this.T('pwu', run.units === 'imperial' ? '/MI' : '/KM');
+      this.T('cadu', 'SPM');
+    } else {
+      // With the feel layer on, the number shows each stroke; otherwise a lightly smoothed reading.
+      this.dispPower += (f.rider.power - this.dispPower) * (1 - Math.exp(-f.dt / 0.25));
+      const shownPower = on && f.rider.cadence > 20 ? feel.strokeWatts : this.dispPower;
+      this.T('pwn', showPw ? String(Math.round(shownPower)) : '—');
+      this.T('pwu', 'W');
+      this.T('cadu', 'RPM');
+    }
     this.T('zl', feel.ridePeakLabel > 0 ? 'RIDE PEAK' : `ZONE ${zone + 1} · ${POWER_ZONE_NAMES[zone].toUpperCase()}`);
     const pw = el.pwn; const load = clamp(I * f.feelConfig.load, 0, 1.2); const pu = on ? feel.pulse : 0; const split = pu * 2.2 * I;
     pw.style.setProperty('--w', String(Math.round(clamp(on ? 360 + 420 * load + 70 * pu : 520, 100, 900))));
@@ -323,7 +347,7 @@ export class Stage {
     pw.classList.toggle('inv', on && feel.invert > 0);
     const MAXP = 1.9;
     el.pbar.style.width = `${clamp(pct / MAXP) * 100}%`;
-    const tf = state.workout.targetFraction;
+    const tf = this.targetEffort(state);
     el.ptgt.style.opacity = tf === undefined || hidden('target') ? '0' : '1';
     if (tf !== undefined) el.ptgt.style.left = `${clamp(tf / MAXP) * 100}%`;
     el.ppk.style.opacity = on && feel.peak30 > 0 && showPw ? String(feel.carrying ? 1 : 0.75) : '0';
@@ -335,7 +359,7 @@ export class Stage {
     for (let i = 0; i < 3; i++) (el.chev.children[i] as HTMLElement).classList.toggle('on', i < Math.abs(trend));
     this.T('hr', showHr && f.rider.heartRate > 0 ? String(Math.round(f.rider.heartRate)) : '—');
     this.T('cad', showCad ? String(Math.round(f.rider.cadence)) : '—');
-    this.T('tg', state.workout.targetWatts !== undefined ? `TGT ${Math.round(state.workout.targetWatts)}` : 'FREE RIDE');
+    this.T('tg', this.targetText(state.workout, run?.units ?? 'metric', true) ?? (run ? 'FREE RUN' : 'FREE RIDE'));
     el.tgbox.style.opacity = hidden('target') ? '0' : '0.75';
     const hrFrac = f.maxHr > 0 ? f.rider.heartRate / f.maxHr : 0;
     el.hrbox.style.color = hrFrac > 0.93 ? '#ff7a6a' : '';
@@ -367,8 +391,8 @@ export class Stage {
     const call = widget('call'); const boost = widget('boost'); const modes = widget('modes');
     const sinceStep = state.workout.timeInStep;
     const stepPeak = state.workout.step.target ? Math.max(state.workout.step.target.from, state.workout.step.target.to) : 0;
-    const hardStep = state.workout.targetFraction !== undefined && (state.workout.targetFraction >= 1 || (state.workout.step.target?.unit === 'ftp' && stepPeak >= 1));
-    if (spin) { ct = `${(this.rt.workout.steps[spin.stepIndex].label ?? 'EFFORT').toUpperCase()}`; cs = `SPIN UP · ${spin.inSeconds}`; tone = 'alert'; cue = true; }
+    const hardStep = tf !== undefined && (tf >= 1 || (state.workout.step.target?.unit === 'ftp' && stepPeak >= 1));
+    if (spin) { ct = `${(this.rt.workout.steps[spin.stepIndex].label ?? 'EFFORT').toUpperCase()}`; cs = `${run ? 'PICK IT UP' : 'SPIN UP'} · ${spin.inSeconds}`; tone = 'alert'; cue = true; }
     else if (hardStep && sinceStep < 1.5 && t > 1) { ct = (state.workout.step.label ?? '').toUpperCase(); cs = 'GO'; tone = 'danger'; cue = true; }
     else if (challenge) { ct = challenge.inRange ? 'HOLD' : 'CHALLENGE'; cs = challenge.prompt ?? ''; bar = challenge.progress; tone = challenge.inRange ? '' : 'alert'; }
     else if (boost) { ct = 'WARP BOOST'; cs = ''; bar = ss(Number(boost.params.fillFrom ?? boost.from), Number(boost.params.fillTo ?? boost.to), t); tone = 'alert'; }
@@ -463,14 +487,46 @@ export class Stage {
     /* ----- workout strip ----- */
     const wk = state.workout; const step = wk.step;
     this.T('steplab', (step.label ?? step.kind).toUpperCase());
-    this.T('steptgt', wk.targetWatts !== undefined ? `${Math.round(wk.targetWatts)} W · ${Math.round((wk.targetFraction ?? 0) * 100)}% FTP · ${fmtClock(wk.timeLeftInStep + 0.99)}` : `FREE RIDE · ${fmtClock(wk.timeLeftInStep + 0.99)}`);
-    el.ergoff.hidden = step.erg || step.kind === 'free';
+    const units = run?.units ?? 'metric';
+    const tt = this.targetText(wk, units, false);
+    this.T('steptgt', `${tt ?? (run ? 'FREE RUN' : 'FREE RIDE')} · ${fmtClock(wk.timeLeftInStep + 0.99)}`);
+    if (run) {
+      el.ergoff.hidden = run.control || step.kind === 'free';
+      this.T('ergoff', 'YOU SET THE BELT');
+    } else {
+      el.ergoff.hidden = step.erg || step.kind === 'free';
+      this.T('ergoff', 'ERG OFF · RIDE IT YOURSELF');
+    }
     const nx = wk.next;
-    this.T('nextlab', nx ? `NEXT ${(nx.step.label ?? nx.step.kind).toUpperCase()}${nx.targetWatts !== undefined ? ` · ${Math.round(nx.targetWatts)} W` : ''}` : 'RIDE ENDS');
+    const ntt = nx?.targetKind && nx.targetValue !== undefined ? this.valueText(nx.targetKind, nx.targetValue, units) : undefined;
+    this.T('nextlab', nx ? `NEXT ${(nx.step.label ?? nx.step.kind).toUpperCase()}${ntt ? ` · ${ntt}` : ''}` : run ? 'RUN ENDS' : 'RIDE ENDS');
     el.ph.style.left = `${(t / this.rt.duration) * 100}%`;
-    el.steplab.style.color = wk.targetFraction !== undefined ? zoneColour(wk.targetFraction) : '';
+    el.steplab.style.color = tf !== undefined ? zoneColour(tf) : '';
 
     this.drawFog(state, widget('fog'));
+  }
+
+  /** The current target as an FTP-equivalent effort, whatever it is expressed in. */
+  private targetEffort(state: ChapterState): number | undefined {
+    const w = state.workout;
+    if (w.targetFraction === undefined || !w.targetKind) return undefined;
+    return w.targetKind === 'power' ? w.targetFraction : w.targetKind === 'pace' ? paceToEffort(w.targetFraction) : hrToEffort(w.targetFraction);
+  }
+
+  private valueText(kind: TargetKind, value: number, units: 'metric' | 'imperial'): string {
+    if (kind === 'power') return `${Math.round(value)} W`;
+    if (kind === 'pace') return `${formatPace(value, units)} ${units === 'imperial' ? '/MI' : '/KM'}`;
+    return `${Math.round(value)} BPM`;
+  }
+
+  /** "TGT 4:10" on the visor; "4:10 /KM · 100% THRESHOLD" on the strip. Undefined in free ride. */
+  private targetText(w: ChapterState['workout'], units: 'metric' | 'imperial', short: boolean): string | undefined {
+    if (!w.targetKind || w.targetFraction === undefined) return undefined;
+    const value = w.targetKind === 'power' ? w.targetWatts : w.targetKind === 'pace' ? w.targetSpeed : w.targetHr;
+    if (value === undefined) return undefined;
+    if (short) return `TGT ${w.targetKind === 'pace' ? formatPace(value, units) : w.targetKind === 'hr' ? `${Math.round(value)} BPM` : Math.round(value)}`;
+    const of = w.targetKind === 'power' ? 'FTP' : w.targetKind === 'pace' ? 'THRESHOLD' : 'MAX HR';
+    return `${this.valueText(w.targetKind, value, units)} · ${Math.round(w.targetFraction * 100)}% ${of}`;
   }
 
   /** Canopy condensation and the Glass: the AI writing in it. */

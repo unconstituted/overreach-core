@@ -61,6 +61,7 @@ export const SETTINGS: SettingDef[] = [
   { key: 'restingHr', label: 'Resting heart rate', category: 'Rider', midRide: false, store: 'profile', type: 'number', default: 55, min: 30, max: 110, step: 1, unit: 'bpm' },
   { key: 'thresholdPace', label: 'Threshold pace', help: 'The running pace you can hold for about an hour. Running targets are a fraction of this.', category: 'Rider', midRide: false, store: 'profile', type: 'number', default: 300, min: 150, max: 600, step: 1, unit: '/km', format: 'pace' },
   { key: 'weight', label: 'Weight', help: 'Used to work out a realistic speed and distance for your ride file.', category: 'Rider', midRide: false, store: 'profile', type: 'number', default: 75, min: 35, max: 200, step: 0.5, unit: 'kg' },
+  { key: 'sport', label: 'Usual session', help: 'Whether the screen before a session starts on the bike or on the treadmill. You can switch for any session.', category: 'Rider', midRide: false, store: 'profile', type: 'choice', default: 'bike', options: [{ value: 'bike', label: 'Ride' }, { value: 'run', label: 'Run' }] },
   { key: 'units', label: 'Units', category: 'Rider', midRide: true, store: 'profile', type: 'choice', default: 'metric', options: [{ value: 'metric', label: 'Metric (km, kg)' }, { value: 'imperial', label: 'Imperial (miles, lb)' }] },
 
   /* ---- Training ---- */
@@ -98,6 +99,9 @@ export const SETTINGS: SettingDef[] = [
 
   /* ---- Devices ---- */
   { key: 'devices.gradeScale', label: 'Trainer difficulty', help: 'How much of a map\'s gradient the trainer feels on free rides. 100% is the true slope; 50% halves every hill.', category: 'Devices', midRide: true, store: 'settings', type: 'slider', default: 50, min: 0, max: 100, step: 5, unit: '%' },
+
+  { key: 'devices.treadmillControl', label: 'Treadmill control', help: 'Let the workout set the treadmill\'s speed and incline. Off: the visor shows the target pace and you set the belt yourself.', category: 'Devices', midRide: true, store: 'settings', type: 'toggle', default: true },
+  { key: 'devices.treadmillMaxSpeed', label: 'Treadmill top speed', help: 'The fastest the game will ever set the belt, whatever the workout says. The game never restarts a belt you have stopped.', category: 'Devices', midRide: true, store: 'settings', type: 'number', default: 18, min: 6, max: 25, step: 0.5, unit: 'km/h' },
 
   /* ---- Accessibility ---- */
   { key: 'access.subtitles', label: 'Subtitles', category: 'Accessibility', midRide: true, store: 'settings', type: 'toggle', default: true },
@@ -193,6 +197,13 @@ export interface RideConfig {
   weight: number;
   /** Threshold running pace, seconds per kilometre. */
   thresholdPace: number;
+  /** The same, as a speed in m/s. */
+  thresholdSpeed: number;
+  /** The player's usual session. */
+  sport: 'bike' | 'run';
+  treadmillControl: boolean;
+  /** Safety limit for the belt, m/s. */
+  treadmillMaxSpeed: number;
   units: 'metric' | 'imperial';
   feel: FeelConfig;
   hudPosition: 'top' | 'bot';
@@ -217,6 +228,8 @@ export function rideConfig(profile: Record<string, SettingValue>, settings: Reco
   if (s['access.reducedMotion']) { feel.punch = 0; feel.twitch = 0; feel.stopMs = 0; }
   return {
     ftp: p.ftp as number, maxHr: p.maxHr as number, weight: p.weight as number, thresholdPace: p.thresholdPace as number,
+    thresholdSpeed: 1000 / (p.thresholdPace as number), sport: p.sport as RideConfig['sport'],
+    treadmillControl: s['devices.treadmillControl'] as boolean, treadmillMaxSpeed: (s['devices.treadmillMaxSpeed'] as number) / 3.6,
     units: p.units as RideConfig['units'], feel,
     hudPosition: s['hud.position'] as RideConfig['hudPosition'], workoutStrip: s['hud.workoutStrip'] as boolean,
     camera: s['display.camera'] as RideConfig['camera'], storyboard: s['display.storyboard'] as boolean,

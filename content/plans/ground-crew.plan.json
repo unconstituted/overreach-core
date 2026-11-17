@@ -1,0 +1,154 @@
+{
+  "$schema": "../../schemas/plan.schema.json",
+  "format": 1,
+  "id": "ground-crew",
+  "title": "Ground Crew",
+  "description": "Four weeks on the treadmill: easy running to build the habit, one harder session a week, and a longer run at the weekend. The last week runs Chapter 1 on foot, at the same effort as the ride.",
+  "sport": "run",
+  "level": "beginner",
+  "goal": "Run three times a week and finish Chapter 1 on foot",
+  "hoursPerWeek": [
+    2,
+    3
+  ],
+  "style": "calendar",
+  "weeks": [
+    {
+      "title": "Week 1",
+      "focus": "Find the belt",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:deck-run",
+              "note": "Check your threshold pace in Settings. If this is not conversational, slow it down."
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:heartline"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:deck-run",
+              "alternatives": [
+                "workout:heartline"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 2",
+      "focus": "Add a harder day",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:deck-run"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:relay-threshold",
+              "alternatives": [
+                "workout:heartline"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:long-haul-on-foot"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 3",
+      "focus": "Build",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:heartline"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:relay-threshold"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "sessions": [
+            {
+              "ref": "workout:deck-run",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:long-haul-on-foot"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 4",
+      "focus": "Story week",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:deck-run"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:heartline"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "chapter:ch1",
+              "note": "Choose Run on the screen before the session. Every target becomes a pace at the same effort."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

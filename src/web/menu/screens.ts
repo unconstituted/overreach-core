@@ -8,6 +8,7 @@ import {
 } from '../../core/settings';
 import { addDays, formatDate, WEEKDAY_NAMES, weekday } from '../../core/util/date';
 import { POWER_ZONE_NAMES } from '../../core/record';
+import { formatPace } from '../../core/workout';
 import { mountDevicePanel } from '../devicePanel';
 import type { MenuApp, Screen } from './app';
 import {
@@ -16,6 +17,8 @@ import {
 import { add, h } from './dom';
 
 const LEVEL: Record<string, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+/** Seconds per kilometre as m:ss. */
+const fmtPaceSetting = (secPerKm: number): string => `${Math.floor(secPerKm / 60)}:${String(Math.round(secPerKm % 60)).padStart(2, '0')}`;
 const dots = (n: number): string => '●'.repeat(n) + '○'.repeat(Math.max(0, 5 - n));
 const refHref = (ref: string): string => `#/ride/${encodeURIComponent(ref)}`;
 
@@ -317,15 +320,31 @@ export const ride: Screen = async (app, params) => {
       h('p', { class: 'small dim' }, 'The ride ends when you reach the end of the map, or when you choose End ride.')));
   } else {
     out.append(h('section', { class: 'panel stack' }, workoutGraph(entry.graph, 'graph tall'),
-      h('p', { class: 'facts' }, fact('', fmtDuration(entry.duration ?? 0)), fact('intensity', entry.intensity?.toFixed(2)), fact('training stress', entry.stress), fact('W is your FTP', ftp)),
-      h('p', { class: 'small dim' }, 'The dashed line is your FTP. Targets are set from it; change it in Settings if the easy parts are not easy.')));
+      h('p', { class: 'facts' }, fact('', fmtDuration(entry.duration ?? 0)), fact('intensity', entry.intensity?.toFixed(2)), fact('training stress', entry.stress),
+        entry.sport === 'run' ? fact('threshold pace', `${fmtPaceSetting(Number(app.player.profile.thresholdPace))} /km`) : fact('W is your FTP', ftp)),
+      h('p', { class: 'small dim' }, entry.sport === 'run'
+        ? 'The dashed line is your threshold pace. Targets are set from it; change it in Settings if the easy parts are not easy.'
+        : 'The dashed line is your FTP. Targets are set from it; change it in Settings if the easy parts are not easy.')));
   }
+  const go = h('button', { class: 'primary go', id: 'ride-start' }, 'Start ride');
+  // A pace workout is run-only; anything else can be ridden, or run at the same effort.
+  const runOnly = entry.sport === 'run';
   const dev = h('section', { class: 'panel', id: 'pre-devices' });
-  app.onLeave(mountDevicePanel(dev, app.devices));
-  out.append(dev);
+  app.onLeave(mountDevicePanel(dev, app.devices, {
+    sports: runOnly ? ['run'] : ['bike', 'run'],
+    initial: runOnly ? 'run' : (app.player.profile.sport as 'bike' | 'run' | undefined) ?? 'bike',
+    onSport: (sp) => {
+      app.rideSport = sp;
+      go.textContent = sp === 'run' ? 'Start run' : 'Start ride';
+      const note = out.querySelector('#pre-sport-note');
+      if (note) note.textContent = sp === 'run' && !runOnly && type !== 'map'
+        ? 'Running it: every power target becomes a pace at the same effort, from your threshold pace in Settings.'
+        : sp === 'run' && type === 'map' ? 'Running it: the hills become treadmill incline (uphill only), and your own pace moves you along.' : '';
+    },
+  }));
+  out.append(dev, h('p', { class: 'small dim', id: 'pre-sport-note' }));
 
   const feelDef = SETTINGS.find((d) => d.key === 'feel.preset') as SettingDef & { type: 'choice' };
-  const go = h('button', { class: 'primary go', id: 'ride-start' }, 'Start ride');
   go.onclick = async () => { go.disabled = true; go.textContent = 'Loading…'; await app.startRide(ref); };
   out.append(h('div', { class: 'row' }, go,
     h('label', null, 'Feel', h('select', {
@@ -344,17 +363,24 @@ export const done: Screen = (app) => {
   const { outcome, result } = last;
   const r = outcome.record;
   const sm = result.summary;
+  const run = result.sport === 'run';
   const out = h('div', { class: 'stack', id: 'post-ride' },
     h('div', null, h('p', { class: 'kicker' }, r.complete ? (r.kind === 'chapter' ? 'Chapter complete' : r.kind === 'freeRide' ? 'Map complete' : 'Workout complete') : 'Ride ended early'), h('h1', null, r.title)),
-    h('section', { class: 'panel stack' }, h('h2', null, `Ride summary${result.simulated ? ' · simulated rider' : ''}`),
-      h('div', { class: 'stats' }, stat(fmtClock(r.duration), 'Duration'), stat(String(r.normalisedPower), 'Normalised power · W'), stat(String(r.avgPower), 'Average power · W'),
-        stat(String(r.kilojoules), 'Work · kJ'), stat(fmtDistance(r.distance, app.units), 'Distance'),
+    h('section', { class: 'panel stack' }, h('h2', null, `${run ? 'Run' : 'Ride'} summary${result.simulated ? (run ? ' · simulated runner' : ' · simulated rider') : ''}`),
+      h('div', { class: 'stats' }, stat(fmtClock(r.duration), 'Duration'),
+        run
+          ? [stat(fmtDistance(r.distance, app.units), 'Distance'),
+            stat(sm ? formatPace(sm.avgSpeed, app.units === 'imperial' ? 'imperial' : 'metric') : '–', `Average pace · ${app.units === 'imperial' ? '/mi' : '/km'}`),
+            sm?.avgCadence ? stat(String(Math.round(sm.avgCadence)), 'Average cadence · spm') : null,
+            sm?.hasPower ? stat(String(r.avgPower), 'Average running power · W') : null]
+          : [stat(String(r.normalisedPower), 'Normalised power · W'), stat(String(r.avgPower), 'Average power · W'),
+            stat(String(r.kilojoules), 'Work · kJ'), stat(fmtDistance(r.distance, app.units), 'Distance')],
         r.avgHeartRate ? stat(String(r.avgHeartRate), 'Average heart rate') : null, r.maxHeartRate ? stat(String(r.maxHeartRate), 'Max heart rate') : null,
         stat(r.intensity.toFixed(2), 'Intensity factor'), stat(String(r.stress), 'Training stress'))));
   if (sm) {
     const total = sm.timeInPowerZones.reduce((a, b) => a + b, 0) || 1;
     const mid = [0.5, 0.65, 0.8, 0.95, 1.1, 1.3, 1.6];
-    out.append(h('section', { class: 'panel stack' }, h('h2', null, 'Time in power zones'),
+    out.append(h('section', { class: 'panel stack' }, h('h2', null, run && !sm.hasPower ? 'Time in effort zones' : 'Time in power zones'),
       h('div', { class: 'zones' }, sm.timeInPowerZones.map((s, i) => h('i', { style: { width: `${(s / total) * 100}%`, background: zoneColour(mid[i]) } }))),
       h('div', { class: 'zonekey' }, sm.timeInPowerZones.map((s, i) => h('span', null, h('i', { style: { background: zoneColour(mid[i]) } }), `Z${i + 1} ${POWER_ZONE_NAMES[i]} · ${fmtClock(s)}`)))));
   }
@@ -387,8 +413,8 @@ function rideTable(app: MenuApp, rides: MenuApp['player']['history']): HTMLEleme
     h('thead', null, h('tr', null, ['Date', 'Ride', 'Time', 'Distance', 'NP', 'IF', 'TSS', ''].map((c) => h('th', null, c)))),
     h('tbody', null, rides.map((r) => h('tr', { 'data-ride': r.id },
       h('td', null, formatDate(r.date.slice(0, 10), true)),
-      h('td', null, r.title, r.complete ? null : h('span', { class: 'dim' }, ' (part)'), r.session ? h('span', { class: 'dim' }, ' · plan') : null),
-      h('td', null, fmtClock(r.duration)), h('td', null, fmtDistance(r.distance, app.units)), h('td', null, `${r.normalisedPower} W`), h('td', null, r.intensity.toFixed(2)), h('td', null, r.stress),
+      h('td', null, r.sport === 'run' ? h('span', { class: 'dim' }, 'Run · ') : null, r.title, r.complete ? null : h('span', { class: 'dim' }, ' (part)'), r.session ? h('span', { class: 'dim' }, ' · plan') : null),
+      h('td', null, fmtClock(r.duration)), h('td', null, fmtDistance(r.distance, app.units)), h('td', null, r.normalisedPower ? `${r.normalisedPower} W` : '–'), h('td', null, r.intensity.toFixed(2)), h('td', null, r.stress),
       h('td', null, r.hasFit ? h('button', {
         class: 'link', 'data-fit': r.id, onclick: async () => {
           const bytes = await app.store.getFit(r.id);

@@ -27,6 +27,7 @@ if (q.has('chapter') || q.has('auto')) {
     chapter: q.get('chapter') ?? 'ch1',
     startAt: q.has('t') ? parseFloat(q.get('t') as string) : undefined,
     auto: q.has('auto'), rate, mute: q.has('mute'), noWorld: q.has('noworld'),
+    sport: q.get('sport') === 'run' ? 'run' : undefined,
   });
   (window as unknown as { overreach: RideApp }).overreach = app;
   app.init().catch(fail);

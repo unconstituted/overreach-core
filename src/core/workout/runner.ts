@@ -2,6 +2,15 @@ import {
   stepPeakFraction, stepStarts, targetAt, targetKind, toAbsolute, toFraction,
   type TargetKind, type TextEvent, type Thresholds, type Workout, type WorkoutStep,
 } from './model';
+import { hrToEffort, paceToEffort } from './effort';
+import type { TargetUnit } from './model';
+
+/** A target value in any unit, as an FTP-equivalent effort (see `effort.ts`). */
+export function effortOf(value: number, unit: TargetUnit, thresholds: Thresholds): number {
+  const f = toFraction(value, unit, thresholds);
+  const kind = targetKind(unit);
+  return kind === 'power' ? f : kind === 'pace' ? paceToEffort(f) : hrToEffort(f);
+}
 
 export interface Cue {
   kind: 'spin-up';
@@ -125,6 +134,18 @@ export class WorkoutRunner {
     const step = this.workout.steps[i];
     const v = targetAt(step, t - this.starts[i]);
     return v === undefined || !step.target || targetKind(step.target.unit) !== 'power' ? undefined : toAbsolute(v, step.target.unit, this.thresholds);
+  }
+
+  /**
+   * Target at time `t` as an FTP-equivalent effort (see `effort.ts`), whatever
+   * the target is expressed in. Undefined in free ride.
+   */
+  targetEffortAt(t: number): number | undefined {
+    const i = this.stepIndexAt(t);
+    const step = this.workout.steps[i];
+    const v = targetAt(step, t - this.starts[i]);
+    if (v === undefined || !step.target) return undefined;
+    return effortOf(v, step.target.unit, this.thresholds);
   }
 
   stateAt(t: number): RunnerState {

@@ -213,6 +213,7 @@ export function buildCatalogue(src: ContentSources): CatalogueResult {
     entries.push(e);
   }
 
+  const workoutSport = new Map(entries.filter((e) => e.type === 'workout').map((e) => [e.id, e.sport]));
   for (const [path, p] of sorted(src.plans)) {
     let sessions = 0;
     if (p.weeks.length === 0) problems.push(`${path}: a plan needs at least one week`);
@@ -232,6 +233,8 @@ export function buildCatalogue(src: ContentSources): CatalogueResult {
             const r = parseRef(ref);
             if (!r) problems.push(`${what}: "${ref}" is not a valid reference (use workout:<id> or chapter:<id>)`);
             else if (!ids[r.type].has(r.id)) problems.push(`${what}: ${r.type} "${r.id}" not found`);
+            // A running plan can include cycling sessions (they are run at the same effort); a cycling plan cannot include a pace workout.
+            else if (p.sport === 'bike' && r.type === 'workout' && workoutSport.get(r.id) === 'run') problems.push(`${what}: "${r.id}" is a running workout in a cycling plan`);
           }
         }
       });

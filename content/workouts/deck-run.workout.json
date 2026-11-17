@@ -1,0 +1,64 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "deck-run",
+  "title": "Deck Run",
+  "description": "Thirty-five easy minutes on the belt, with six short strides near the end to wake the legs up. Conversational pace. If you cannot talk, slow down.",
+  "sport": "run",
+  "focus": "endurance",
+  "difficulty": 2,
+  "tags": [
+    "easy",
+    "strides"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.6,
+      "to": 0.78,
+      "label": "Walk to jog",
+      "intensity": "warmup",
+      "texts": [
+        {
+          "offset": 5,
+          "message": "Easy onto the belt. Find your feet first."
+        }
+      ]
+    },
+    {
+      "kind": "steady",
+      "duration": 1200,
+      "pace": 0.8,
+      "label": "Easy running",
+      "texts": [
+        {
+          "offset": 600,
+          "message": "Halfway. Shoulders down, breathe."
+        }
+      ]
+    },
+    {
+      "kind": "intervals",
+      "repeat": 6,
+      "on": {
+        "duration": 20,
+        "pace": 1.1,
+        "label": "Stride"
+      },
+      "off": {
+        "duration": 60,
+        "pace": 0.75,
+        "label": "Float"
+      }
+    },
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.75,
+      "to": 0.55,
+      "label": "Walk it off",
+      "intensity": "cooldown"
+    }
+  ]
+}

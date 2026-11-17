@@ -126,11 +126,24 @@ The game talks to three interfaces in `src/devices/types.ts`: `PowerSource`, `He
 - **The simulator is a real peripheral, not a shortcut.** `SimFtmsPeripheral` implements that transport and answers with the bytes a physical trainer sends, so the same `FtmsTrainer` code runs against it. `SimTrainer` adds a rider: ERG lag and noise, following targets when ERG is off, a manual override, and stopping. `SimHeartRate` lags power with a slower recovery and some drift.
 - **`bluetooth.ts`** is the only file that touches `navigator.bluetooth`. It handles reconnection and restores the last target afterwards. It has only been tested against a fake GATT stack; see `docs/TESTING-WITH-HARDWARE.md`.
 
+### Running
+
+Running sits on the same interfaces. A treadmill or footpod is a `RunSource`; a treadmill that accepts commands is a `ControllableTreadmill`. `DeviceManager` has a run mode with two slots: the **belt** (a treadmill, smart or not) gives speed, incline and distance, and the **pod** (a footpod) gives cadence and running power, and speed when there is no treadmill.
+
+- `protocol/treadmill.ts` (FTMS Treadmill Data and treadmill control) and `protocol/rsc.ts` (Running Speed and Cadence) are pure and tested at byte level.
+- `FtmsTreadmill` holds the control logic. Safety comes first: every target is clamped to the treadmill's own range and to the player's top-speed setting, and **once the treadmill reports that the runner stopped the belt (stop button or safety key), the engine sends nothing more until the runner presses play.** A reconnect never restarts a stopped belt either. The ride pauses when that happens.
+- `SimTreadmill` is a treadmill, a runner and a footpod speaking real bytes, with treadmill-rate acceleration and a stop button.
+- `connectTreadmill` and `connectFootpod` are the Web Bluetooth side; a Stryd-style pod also gives running power over the Cycling Power Service.
+
+The rest of the game does not know running from cycling, because of one mapping in `src/core/workout/effort.ts`: running pace (and incline, and heart rate) to an **FTP-equivalent effort**. 80% of threshold pace is 50% of FTP, threshold is threshold, 108% is 120%. The ride loop turns the runner's speed into effort and hands it, as watts, to the feel layer, the chapter runtime and its challenges, the world's speed response and the simulated heart. Training load and workout graphs are scored the same way. `asRun` uses the inverse to turn any cycling workout into the same session as a run, which is how Chapter 1 is run.
+
+What changes on screen: pace replaces watts as the hero number (per kilometre or mile by the player's units), cadence reads SPM, the countdown says "Pick it up", and the post-run screens show distance and pace. The `.fit` file is a treadmill run (sport 1, sub-sport 1) with distance from the belt and cadence in strides per minute, as Garmin writes it.
+
 ## The feel layer
 
 `FeelEngine` (`src/core/feel/feel.ts`) turns power and cadence into:
 
-- **strokes**: two per crank revolution, each a "strike" whose strength depends on how it compares with the 10-second average;
+- **strokes**: two per crank revolution (one per step for a runner), each a "strike" whose strength depends on how it compares with the 10-second average;
 - **a peak-hold line**: the best stroke of the last 30 seconds; breaking it is an event, with a short hit-stop;
 - **intensity**: 0 below the onset (76% of FTP by default) rising to 1 by about 122%;
 - **the speed factor**: a spring towards an effort-based target, critically damped at low effort and underdamped above VO2.
@@ -146,6 +159,7 @@ All parameters live in one `FeelConfig` object. `FEEL_PRESETS` has `off`, `restr
 - `npm test`: unit tests for everything in `src/core` and `src/devices`, including the property test on workout durations, FIT round trips, byte-level protocol fixtures, runtime seeking and the Chapter 1 port.
 - `npm run validate`: schema and semantic checks on every chapter.
 - `npm run check:menu`: builds, then walks the menus in headless Chromium: start a plan, ride today's session at accelerated time, see it completed and the plan advance, change settings and reload, come back three days later to a pushed session, free-ride a map, re-download a `.fit`, export and import, and confirm that a plan served purely as data shows up.
+- `npm run check:run`: builds, then runs Chapter 1 on the simulated treadmill in real time (pace on the visor, the belt following the workout, the runner pressing stop and the run pausing with the belt left stopped, then carrying on), runs a session of the Ground Crew plan from the menus, and runs the whole chapter accelerated, decoding each `.fit` as a treadmill run.
 - `npm run check:ride`: builds, then rides the whole chapter in headless Chromium at accelerated time with the simulated rider, checks seeking and stop-pedalling behaviour, and decodes the downloaded `.fit`. It needs Playwright, which is not a project dependency.
 
 ## Known limits
@@ -154,4 +168,6 @@ All parameters live in one `FeelConfig` object. `FEEL_PRESETS` has `off`, `restr
 - A `.fit` upload to Garmin Connect or Strava has not been tried; the file decodes cleanly with an independent decoder.
 - The 3D view is placeholder art carried over from the prototype.
 - The score is a procedural sketch, not music.
-- Only cycling is modelled. The workout model has a `sport` field, but running needs its own targets (pace, not watts) and devices.
+- Treadmills and footpods have never met real hardware either. The FTMS treadmill pace fields are known to be implemented inconsistently by manufacturers; the engine relies only on speed.
+- Running maps send their gradient as incline, uphill only (most treadmills cannot go downhill).
+- A chapter challenge on `cadence` means steps per minute for a runner. Effort-based conditions work for both sports; cadence ones need writing per sport.

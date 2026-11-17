@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "long-haul-on-foot",
+  "title": "Long Haul on Foot",
+  "description": "An hour at an easy, even pace, with the last ten minutes a notch quicker. The run that builds everything else.",
+  "sport": "run",
+  "focus": "endurance",
+  "difficulty": 3,
+  "tags": [
+    "long run"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 420,
+      "from": 0.6,
+      "to": 0.78,
+      "label": "Warm up",
+      "intensity": "warmup"
+    },
+    {
+      "kind": "steady",
+      "duration": 2580,
+      "pace": 0.8,
+      "label": "Long haul",
+      "texts": [
+        {
+          "offset": 1200,
+          "message": "Twenty minutes in. Drink something."
+        }
+      ]
+    },
+    {
+      "kind": "steady",
+      "duration": 600,
+      "pace": 0.88,
+      "label": "Finish quicker"
+    }
+  ]
+}

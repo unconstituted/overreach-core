@@ -3,8 +3,10 @@ import { gradeAt } from './catalogue';
 import type { MapDoc } from './types';
 
 /**
- * A free ride on a map: the rider's power moves a bike along the terrain
- * profile, and that drives both what they see and what the trainer simulates.
+ * A free ride (or free run) on a map. On the bike, the rider's power moves a
+ * bike along the terrain profile, and that drives both what they see and what
+ * the trainer simulates. On foot, the treadmill or footpod speed moves the
+ * runner along it (`updateRun`), and the profile becomes treadmill incline.
  */
 export class FreeRide {
   /** Road speed, m/s. */
@@ -35,7 +37,17 @@ export class FreeRide {
     if (grade > 0) this.climbed += (d * grade) / 100;
   }
 
-  /** Grade to send to the trainer, percent, after the player's "trainer difficulty" setting. */
+  /** Running: the runner's own speed (m/s, from the treadmill or footpod) moves them along the map. */
+  updateRun(dt: number, speed: number): void {
+    if (this.finished || dt <= 0) return;
+    const grade = this.grade;
+    this.speed = Math.max(0, speed);
+    const d = Math.min(this.speed * dt, this.remaining);
+    this.distance += d;
+    if (grade > 0) this.climbed += (d * grade) / 100;
+  }
+
+  /** Grade to send to the trainer (or treadmill incline), percent, after the player's "trainer difficulty" setting. */
   trainerGrade(scale: number): number {
     return Math.round(this.grade * scale * 10) / 10;
   }

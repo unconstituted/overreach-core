@@ -58,10 +58,14 @@ Either inline steps, or a file:
 ```
 
 - `power` is a fraction of FTP: `1.0` is FTP, `1.15` is 115%. Use `watts` instead for an absolute target.
+- For running, use `pace`, a fraction of the runner's threshold pace as a speed (`1.0` is threshold, `1.05` is 5% faster, `0.8` is easy), or `secPerKm` for an absolute pace (`300` is 5:00 per km).
+- For heart rate, use `hr`, a fraction of maximum heart rate (`0.72`), or `bpm`. A heart-rate step cannot be held by a trainer or treadmill; the player rides or runs it to feel.
+- A `ramp`'s `from` and `to` are fractions of FTP, or of threshold pace in a running workout. Give `"unit": "hr"` (or `watts`, `speed`, `bpm`) to say otherwise.
 - `cadence` (rpm) is optional.
 - `"erg": false` hands resistance back to the rider for that step. Use it for surges, where ERG mode feels like hitting a wall.
 - `label` is what the rider sees. Keep it short.
-- The engine adds a "spin up" countdown five seconds before any step at 100% of FTP or more. You do not write those.
+- The engine adds a "spin up" countdown (for a runner, "pick it up") five seconds before any step at 100% of FTP or threshold pace or more. You do not write those.
+- You do not need to write a running version of a chapter. Any power-based workout can be run: the player chooses **Run** before the session, and every power target becomes a pace at the same effort (50% of FTP is 80% of threshold pace, FTP is threshold pace, 120% is 108%). Write pace targets only for a session that is meant to be run.
 
 ## Dialogue
 
@@ -188,6 +192,7 @@ A challenge watches the rider for a window of time and branches on the result:
 ```
 
 - `metric`: `power` (watts), `powerFtp` (fraction of FTP), `powerTarget` (fraction of the current workout target), `cadence`, `heartRate`, `heartRateMax` (fraction of max).
+- For a runner, `power`, `powerFtp` and `powerTarget` are judged on effort: holding threshold pace counts as 100% of FTP, and holding the target pace counts as 100% of the target. So `powerFtp` and `powerTarget` challenges work for both sports without change. `powerTarget` is the safest choice. `cadence` is steps per minute for a runner (170 or so), so a pedalling challenge such as "above 90 rpm" is no challenge on foot: prefer an effort condition, or give the runner a different prompt.
 - The rider must stay between `min` and `max` for `hold` seconds without a break. `grace` forgives short slips.
 - It succeeds the moment the hold is met, and fails if the window closes first.
 - Times inside a branch are measured **from the moment it resolves**, so `"t": 0` means "right then".
@@ -239,7 +244,9 @@ Ids are lower-case letters, digits and hyphens. The file name should match the i
 - `steps` are exactly the steps described under "Workout" above.
 - To use a Zwift or Garmin file instead, put it beside the JSON and write `"file": "storm-front.zwo"` in place of `steps`. Its text events show on the visor.
 - `focus` is one of `recovery`, `endurance`, `tempo`, `sweetspot`, `threshold`, `vo2`, `anaerobic`, `sprint`, `mixed`, `test`. `difficulty` is 1 to 5. Both are for the library's filters.
-- Duration, intensity, training stress and whether it counts as a hard day are worked out for you from the steps.
+- `sport` is `bike` (the default) or `run`. A running workout uses `pace`, `secPerKm`, `hr` or `bpm` targets, and can only be run. A cycling workout can be ridden or run (see above).
+- Duration, intensity, training stress and whether it counts as a hard day are worked out for you from the steps. Runs are scored by effort, so an hour at threshold pace scores like an hour at FTP.
+- Zwift run files (`<sportType>run</sportType>`) work as they are: their `Power` values are read as fractions of threshold pace, as Zwift means them.
 - A plain workout is ridden in open space, with the ship's speed following the targets. Step text (`texts`) appears in the centre of the visor under "CONTROL", so use it for coaching lines.
 
 ## Plans (`content/plans/<id>.plan.json`)
@@ -275,6 +282,7 @@ Ids are lower-case letters, digits and hyphens. The file name should match the i
 - `alternatives` are swaps the player may pick on the day (a shorter or easier version).
 - `style` is `calendar` for a training block or `story` for a plan built round a season's chapters (name it with `"season": "season-1"`). The two work the same; the label tells the player what they are getting.
 - `level` is `beginner`, `intermediate` or `advanced`; `hoursPerWeek` is `[low, high]`.
+- `sport` is `bike` or `run`. A running plan may include cycling workouts and chapters: they are run at the same effort. A cycling plan may not include a running workout, and the validator says so. `ground-crew` is a running plan whose last week runs Chapter 1 on foot.
 
 What the engine does with it, so you can design for it: a missed session is pushed to the next free day of the same week, unless that would put two hard days back to back, in which case it is dropped (players can choose "skip" instead in Settings). So do not put hard sessions on consecutive days, and give the player an easy alternative on the hardest days.
 

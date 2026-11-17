@@ -254,7 +254,12 @@ export interface Chapter {
 
 /** Live rider data fed to the runtime each frame. */
 export interface RiderData {
+  /**
+   * Watts. For a runner, the FTP-equivalent effort in watts (effort × FTP, see
+   * `workout/effort.ts`), so power conditions in a chapter work for both sports.
+   */
   power: number;
+  /** Pedal rpm, or running steps per minute. */
   cadence?: number;
   heartRate?: number;
 }

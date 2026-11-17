@@ -7,6 +7,8 @@ import type {
 export interface RuntimeOptions {
   ftp: number;
   maxHr?: number;
+  /** Threshold running speed, m/s, for pace targets. */
+  thresholdSpeed?: number;
   /** The parsed workout, required when the chapter references a workout file. */
   workout?: Workout;
   /** Real clip lengths in seconds (from the audio layer), for exact mid-clip resume. */
@@ -173,7 +175,7 @@ export class ChapterRuntime {
     this.initialFlags = { ...(opts.initialFlags ?? {}) };
     this.flags = { ...this.initialFlags };
     this.workout = opts.workout ?? loadChapterWorkout(chapter);
-    this.runner = new WorkoutRunner(this.workout, opts.ftp);
+    this.runner = new WorkoutRunner(this.workout, { ftp: opts.ftp, thresholdSpeed: opts.thresholdSpeed, maxHr: opts.maxHr });
     this.duration = chapter.duration;
     this.distance = new DistanceTable(chapter.scene.speed, chapter.duration);
     this.maxStep = opts.maxStep ?? 1.5;
@@ -434,8 +436,10 @@ export class ChapterRuntime {
       case 'power': return rider.power;
       case 'powerFtp': return rider.power / this.opts.ftp;
       case 'powerTarget': {
-        const target = this.runner.targetWattsAt(t);
-        return target ? rider.power / target : undefined;
+        // Effort against the target's effort: the same as power over target watts on the bike,
+        // and it works for pace and heart-rate targets too (a runner's "power" is their effort).
+        const target = this.runner.targetEffortAt(t);
+        return target ? rider.power / this.opts.ftp / target : undefined;
       }
       case 'cadence': return rider.cadence;
       case 'heartRate': return rider.heartRate;

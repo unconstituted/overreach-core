@@ -1,0 +1,44 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "heartline",
+  "title": "Heartline",
+  "description": "Forty minutes run by heart rate, not pace: stay between 70 and 75% of your maximum and let the speed be whatever it is. Good on tired legs and hot days.",
+  "sport": "run",
+  "focus": "endurance",
+  "difficulty": 2,
+  "tags": [
+    "heart rate",
+    "easy"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.6,
+      "to": 0.7,
+      "unit": "hr",
+      "label": "Warm up",
+      "intensity": "warmup"
+    },
+    {
+      "kind": "steady",
+      "duration": 1800,
+      "hr": 0.72,
+      "label": "Heartline",
+      "texts": [
+        {
+          "offset": 10,
+          "message": "Run to the heart, not the clock. Slow down if it drifts up."
+        }
+      ]
+    },
+    {
+      "kind": "steady",
+      "duration": 300,
+      "hr": 0.62,
+      "label": "Cool down",
+      "intensity": "cooldown"
+    }
+  ]
+}

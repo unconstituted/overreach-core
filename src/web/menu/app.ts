@@ -37,6 +37,8 @@ export class MenuApp {
   player!: PlayerData;
   store!: PlayerStore;
   readonly devices = new DeviceManager();
+  /** Ride or run, as chosen on the screen before the session. */
+  rideSport: 'bike' | 'run' = 'bike';
   /** The document of the active plan, kept loaded. */
   activePlan?: PlanDoc;
   /** What the last ride changed, for the post-ride screen. */
@@ -212,6 +214,7 @@ export class MenuApp {
       chapter: p.chapter.id, rate: this.opts.rate, mute: this.opts.mute, noWorld: this.opts.noWorld,
       session: {
         chapter: p.chapter, workout: p.workout, assetBase: p.assetBase, map: p.map, devices: this.devices,
+        sport: p.entry.sport === 'run' ? 'run' : this.rideSport,
         config: rideConfig(this.player.profile, this.player.settings),
         initialFlags: season ? this.player.progress.flags[season] : undefined,
         onFinish: (result) => void this.finishRide(ref, p.entry, p.kind, result),
@@ -244,7 +247,7 @@ export class MenuApp {
     const record: RideRecord = {
       id: `ride-${Math.round(result.startTime)}`,
       date: `${this.today()}T${p2(start.getHours())}:${p2(start.getMinutes())}`,
-      sport: entry.sport ?? 'bike', kind, ref, title: entry.title, complete: result.complete, ftp: Number(this.player.profile.ftp),
+      sport: result.sport, kind, ref, title: entry.title, complete: result.complete, ftp: Number(this.player.profile.ftp),
       duration: sm.duration, distance: Math.round(sm.distance), kilojoules: Math.round(sm.kilojoules), avgPower: Math.round(sm.avgPower),
       normalisedPower: Math.round(sm.normalisedPower), intensity: Math.round(sm.intensityFactor * 100) / 100, stress: Math.round(sm.trainingStress),
       avgHeartRate: sm.avgHeartRate ? Math.round(sm.avgHeartRate) : undefined, maxHeartRate: sm.maxHeartRate ? Math.round(sm.maxHeartRate) : undefined,

@@ -71,6 +71,39 @@ Open `http://localhost:5173/`, choose **Bluetooth…** for the trainer and heart
 
 If a platform rejects the file, run it through Garmin's FIT SDK tools (`FitCSVTool`) and note the first error. The usual causes are a missing or mis-ordered message, which is a small fix in `src/core/record/fitActivity.ts`.
 
+## 4. Treadmills and footpods
+
+**Safety first.** Keep the safety key clipped on and the stop button within reach. The game should never restart a belt you have stopped; if it ever does, stop testing and report it as the first finding. Start with the top-speed setting (Settings → Devices) a little above your threshold pace.
+
+On the device test page, or on the screen before a session, choose **Run**.
+
+### Treadmill (FTMS)
+
+- [ ] **Bluetooth…** on the Treadmill row lists the treadmill, and it connects as "FTMS treadmill (controllable)" or "(read-only)".
+- [ ] Walk or jog: the speed shown matches the treadmill's own display, within 0.1 km/h.
+- [ ] Incline: change it on the treadmill; the reading follows.
+- [ ] Start a run with **Treadmill control** on. The belt starts by itself at the first target, gently, and changes speed at each step. Note how long each change takes.
+- [ ] Press the treadmill's own **stop**: the run pauses, the visor says "Belt stopped", and **the belt stays still** however long you wait. Press play in the game: it starts again.
+- [ ] Pull the **safety key**: the same.
+- [ ] Pause in the game: the belt stops. Play: it starts again.
+- [ ] Turn **Treadmill control** off in Settings: the game no longer changes the speed; the visor shows "You set the belt" and the target pace.
+- [ ] A free run on a map: the incline follows the hills (uphill only) at the "trainer difficulty" setting.
+- [ ] End the run: the belt stops and the treadmill is released.
+- [ ] Drop the connection (turn the treadmill's Bluetooth off, or walk the laptop away) mid-run: it reconnects, restores the speed, and does not start a belt that was stopped.
+
+Many treadmills only accept control while their own app is closed, and some need a button pressed on the console first. Note the model and what was needed.
+
+### Footpod (Running Speed and Cadence)
+
+- [ ] **Bluetooth…** on the Footpod row lists the pod.
+- [ ] Cadence reads around 160 to 185 when running. If it reads around 80 to 95, the pod sends strides rather than steps and the doubling rule in `src/devices/protocol/rsc.ts` missed it.
+- [ ] With **no treadmill** (choose None on the Treadmill row), speed comes from the pod. Compare it with the treadmill display: footpods often need calibrating.
+- [ ] A Stryd or similar pod connects "with running power", and the post-run screen shows average running power.
+
+### The run file
+
+- [ ] Upload the `.fit` to Garmin Connect and Strava. It should appear as a treadmill (or indoor) run with distance, pace, heart rate and cadence (Strava doubles the stored strides to show steps).
+
 ## Things worth knowing when it goes wrong
 
 - **Nothing in the picker.** Wake the trainer by pedalling. Check nothing else is connected to it. Some trainers only advertise FTMS when their ANT+ FE-C channel is idle.

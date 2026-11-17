@@ -77,7 +77,7 @@ export interface RideSummary {
   maxCadence?: number;
   avgSpeed: number;
   maxSpeed: number;
-  /** Seconds in power zones 1 to 7. */
+  /** Seconds in power zones 1 to 7 (for a run without power, effort zones from pace). */
   timeInPowerZones: number[];
   /** Seconds in heart-rate zones 1 to 5 (empty when there was no heart-rate data). */
   timeInHrZones: number[];
@@ -114,6 +114,11 @@ export function summarise(samples: RideSample[], ftp: number, maxHr?: number, op
   let intensity = ftp > 0 ? np / ftp : 0;
   let calories = kj / 4.184 / 0.24;
   let normalisedSpeed: number | undefined;
+  if (sport === 'run' && !hasPower && opts.thresholdSpeed) {
+    // No power: time in zones goes by running effort instead, so the zone bar still means something.
+    pz.fill(0);
+    for (const x of samples) pz[powerZone(paceToEffort(x.bikeSpeed / (opts.thresholdSpeed as number)) * 100, 100) - 1]++;
+  }
   if (sport === 'run') {
     // The same rolling fourth-power average, on speed. Effort, not speed, is what is scored,
     // so the result goes through the running effort curve (threshold pace = intensity 1).

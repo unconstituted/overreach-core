@@ -18,7 +18,8 @@
     "ride-script": "tsx tools/ride-script-to-chapter.ts",
     "check:ride": "npm run build && node tools/ride-check.mjs",
     "catalogue": "tsx tools/build-catalogue.ts",
-    "check:menu": "npm run build && node tools/menu-check.mjs"
+    "check:menu": "npm run build && node tools/menu-check.mjs",
+    "check:run": "npm run build && node tools/run-check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

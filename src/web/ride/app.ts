@@ -15,8 +15,8 @@ import { encodeFitActivity, POWER_ZONE_NAMES, RideRecorder, summarise, type Ride
 import { defaultValues, rideConfig, setValue, type RideConfig } from '../../core/settings';
 import { clamp } from '../../core/util/math';
 import { ENGINE_NAME, ENGINE_VERSION } from '../../core/version';
-import type { Workout } from '../../core/workout';
-import { DeviceManager } from '../../devices';
+import { asRun, effortToPace, formatPace, runEffort, workoutKind, type Workout } from '../../core/workout';
+import { DeviceManager, type DeviceSport } from '../../devices';
 import { mountDevicePanel } from '../devicePanel';
 import { RideAudio } from './audio';
 import { fmtClock, Stage, zoneColour } from './stage';
@@ -33,6 +33,7 @@ export interface RideResult {
   /** Story flags at the end of a chapter. */
   flags: Record<string, boolean>;
   simulated: boolean;
+  sport: DeviceSport;
 }
 
 /** A ride launched from the menus: everything is handed in, and the result is handed back. */
@@ -47,6 +48,8 @@ export interface RideSession {
   initialFlags?: Record<string, boolean>;
   /** Present for a free ride: the map to ride. */
   map?: MapDoc;
+  /** Ride or run. A cycling workout run as a run is converted with `asRun` at the same effort. */
+  sport?: DeviceSport;
   onFinish(result: RideResult): void;
 }
 
@@ -62,6 +65,8 @@ export interface RideOptions {
   mute?: boolean;
   /** Skip the 3D view (for tests on machines without WebGL). */
   noWorld?: boolean;
+  /** Ride or run, when opened directly. */
+  sport?: DeviceSport;
   session?: RideSession;
 }
 
@@ -124,6 +129,9 @@ export class RideApp {
   private idleTimer = 0;
   private effortScale = 1;
   private pedalling = true;
+  /** Ride or run. */
+  sport: DeviceSport = 'bike';
+  private unsubStopped?: () => void;
   private lastFit?: Uint8Array;
   private complete = false;
   private summary?: RideSummary;
@@ -139,6 +147,7 @@ export class RideApp {
     if (!this.session) this.feelName = this.settings.feel;
     this.cfg = this.session?.config ?? configFrom(this.settings);
     this.devices = this.session?.devices ?? new DeviceManager({ ftp: this.cfg.ftp });
+    this.sport = this.session?.sport ?? opts.sport ?? (this.session ? this.cfg.sport : 'bike');
     if (this.session) this.chapterBase = this.session.assetBase;
     this.showInserts = this.cfg.storyboard;
     this.cameraOverride = this.cfg.camera === 'auto' ? null : this.cfg.camera;
@@ -152,7 +161,7 @@ export class RideApp {
   async init(): Promise<void> {
     if (this.session) {
       this.chapter = this.session.chapter;
-      if (!this.devices.power) await this.devices.useSimTrainer();
+      await this.ensureDevices();
       await this.start();
       return;
     }
@@ -161,9 +170,16 @@ export class RideApp {
     this.chapter = (await res.json()) as Chapter;
     const problems = checkChapter(this.chapter);
     if (problems.length) console.warn(`Chapter "${this.chapter.id}" has problems:\n  ${problems.join('\n  ')}`);
-    await this.devices.useSimTrainer();
+    await this.ensureDevices();
     if (this.opts.auto) await this.start();
     else this.showStart();
+  }
+
+  /** Make sure there is something to ride (or run) with: the simulated twin unless a device is connected. */
+  private async ensureDevices(): Promise<void> {
+    if (this.sport === 'run') {
+      if (this.devices.sport !== 'run' || (!this.devices.belt && !this.devices.pod)) await this.devices.useSimTreadmill();
+    } else if (this.devices.sport !== 'bike' || !this.devices.power) await this.devices.useSimTrainer();
   }
 
   private async buildRuntime(): Promise<void> {
@@ -176,7 +192,13 @@ export class RideApp {
       const data = /\.zwo$/i.test(path) ? await res.text() : new Uint8Array(await res.arrayBuffer());
       workout = loadChapterWorkout(ch, () => data);
     }
-    this.rt = new ChapterRuntime(ch, { ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, workout, initialFlags: this.session?.initialFlags });
+    workout ??= loadChapterWorkout(ch);
+    // A pace workout can only be run; a power workout can be run at the same effort.
+    if (workoutKind(workout) === 'pace') this.sport = 'run';
+    if (this.sport === 'run' && workoutKind(workout) === 'power') workout = asRun(workout);
+    this.rt = new ChapterRuntime(ch, {
+      ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, thresholdSpeed: this.cfg.thresholdSpeed, workout, initialFlags: this.session?.initialFlags,
+    });
   }
 
   /* ------------------------------------------------------------------ */
@@ -208,7 +230,9 @@ export class RideApp {
       <p class="small dim"><kbd>Space</kbd> pause · <kbd>←</kbd> <kbd>→</kbd> skip 10 s · <kbd>J</kbd> jump to a scene · <kbd>C</kbd> camera · <kbd>H</kbd> HUD top or bottom · <kbd>F</kbd> full screen · <kbd>M</kbd> sound · <kbd>P</kbd> stop pedalling (simulated rider) · ${ENGINE_NAME} ${ENGINE_VERSION}</p>
     </div>`;
     document.body.appendChild(el);
-    const unmount = mountDevicePanel(el.querySelector('#s-dev') as HTMLElement, this.devices);
+    const unmount = mountDevicePanel(el.querySelector('#s-dev') as HTMLElement, this.devices, {
+      onSport: (sp) => { this.sport = sp; },
+    });
     const go = el.querySelector('#s-go') as HTMLButtonElement;
     go.onclick = async () => {
       if (go.disabled) return;
@@ -247,9 +271,22 @@ export class RideApp {
   async start(progress?: (fraction: number) => void): Promise<void> {
     const cfg = this.cfg;
     await this.buildRuntime();
-    // The simulated rider needs to know the FTP the workout is scaled to.
-    if (this.devices.power?.info.kind === 'sim') {
-      this.devices.setSimOptions({ ftp: cfg.ftp, maxHr: cfg.maxHr });
+    // The simulated athlete needs to know the thresholds the workout is scaled to.
+    this.devices.setSimOptions({ ftp: cfg.ftp, maxHr: cfg.maxHr, thresholdSpeed: cfg.thresholdSpeed });
+    if (this.sport === 'run') {
+      if (this.devices.sport !== 'run' || this.devices.belt?.info.kind === 'sim' || (!this.devices.belt && !this.devices.pod)) {
+        await this.devices.useSimTreadmill();
+      }
+      this.devices.treadmillControl = cfg.treadmillControl;
+      this.devices.treadmillLimits.maxSpeed = cfg.treadmillMaxSpeed;
+      this.unsubStopped?.();
+      // The runner stopped the belt themselves: pause, and leave the belt alone until they press play.
+      this.unsubStopped = this.devices.runnerStopped.on(() => {
+        if (!this.playing || this.finished) return;
+        void this.setPlaying(false, true);
+        this.flash = { title: 'BELT STOPPED', text: 'PRESS PLAY WHEN YOU ARE READY', tone: 'alert', until: performance.now() / 1000 + 8 };
+      });
+    } else if (this.devices.sport !== 'bike' || this.devices.power?.info.kind === 'sim' || !this.devices.power) {
       await this.devices.useSimTrainer();
     }
     this.feel = new FeelEngine({ ...cfg.feel }, cfg.ftp);
@@ -305,8 +342,14 @@ export class RideApp {
     if (this.audio) this.audio.volume = { ...cfg.volume };
   }
 
-  async setPlaying(p: boolean): Promise<void> {
+  /** `byRunner`: the treadmill was stopped by the runner, so there is no belt to stop. */
+  async setPlaying(p: boolean, byRunner = false): Promise<void> {
     if (this.finished && p) return;
+    if (this.sport === 'run' && this.started) {
+      // Pausing a run stops the belt the game controls; carrying on lets it start again on the next target.
+      if (p) this.devices.resumeBelt();
+      else if (!byRunner) void this.devices.stopBelt(true);
+    }
     this.playing = p;
     this.stage?.setPaused(!p && this.started && !this.finished);
     const b = this.root.querySelector('[data-act="play"]');
@@ -351,20 +394,33 @@ export class RideApp {
         this.rideClock += h;
         const wk = rt.runner.stateAt(this.T);
         const fr0 = this.freeRide;
-        this.applyRiderControls(wk.targetWatts);
-        if (fr0) this.devices.applyGrade(fr0.trainerGrade(this.cfg.gradeScale));
-        else this.devices.applyTarget(wk.targetWatts, wk.erg, wk.cadence);
+        const running = this.sport === 'run';
+        if (running) {
+          this.applyRunnerControls();
+          // On a map, the hills become treadmill incline (never downhill: most treadmills cannot).
+          this.devices.applyRunTarget(fr0 ? undefined : wk.targetSpeed, fr0 ? Math.max(0, fr0.trainerGrade(this.cfg.gradeScale)) : 0);
+        } else {
+          this.applyRiderControls(wk.targetWatts);
+          if (fr0) this.devices.applyGrade(fr0.trainerGrade(this.cfg.gradeScale));
+          else this.devices.applyTarget(wk.targetWatts, wk.erg, wk.cadence);
+        }
         this.devices.tick(h);
-        fr0?.update(h, live.power);
-        feelEvents.push(...this.feel.update(h, { power: live.power, cadence: live.cadence, targetWatts: wk.targetWatts }));
-        const fr = rt.advance(this.T, { power: live.power, cadence: live.cadence, heartRate: live.heartRate || undefined });
+        if (running) fr0?.updateRun(h, live.speed);
+        else fr0?.update(h, live.power);
+        // A runner's effort, in FTP-equivalent watts, drives everything that cycling power drives.
+        const effortW = running ? runEffort(live.speed, live.incline, this.cfg.thresholdSpeed) * this.cfg.ftp : live.power;
+        const targetW = running ? (rt.runner.targetEffortAt(this.T) ?? 0) * this.cfg.ftp || undefined : wk.targetWatts;
+        feelEvents.push(...this.feel.update(h, {
+          power: effortW, cadence: running ? 0 : live.cadence, strikeRate: running ? live.cadence : undefined, targetWatts: targetW,
+        }));
+        const fr = rt.advance(this.T, { power: effortW, cadence: live.cadence, heartRate: live.heartRate || undefined });
         this.state = fr.state;
         if (fr.seeked) { seeked = true; events.length = 0; } else events.push(...fr.events);
         for (const e of fr.events) if (e.type === 'step') this.recorder.lap(this.rideClock, rt.workout.steps[e.stepIndex].label);
         this.recorder.update(this.rideClock, {
           power: live.power, cadence: live.cadence, heartRate: live.heartRate || undefined,
           gameSpeed: fr0 ? fr0.speed * fr0.sceneScale : fr.state.scene.speed * this.feel.state.speedFactor,
-          roadSpeed: fr0?.speed,
+          roadSpeed: running ? live.speed : fr0?.speed,
         });
         if (fr0?.finished) { this.complete = true; this.finish(); }
         if (!this.finished && this.T >= rt.duration) { this.complete = !fr0; this.finish(); }
@@ -383,10 +439,15 @@ export class RideApp {
       if (e.type === 'step' && this.rate === 1) {
         const s = rt.workout.steps[e.stepIndex];
         const frac = state.workout.targetFraction;
+        const w = state.workout;
+        const run = this.sport === 'run';
+        const what = run && w.targetKind === 'pace' && w.targetSpeed !== undefined
+          ? `${formatPace(w.targetSpeed, this.cfg.units)} ${this.cfg.units === 'imperial' ? '/MI' : '/KM'}`
+          : w.targetKind === 'hr' && w.targetHr !== undefined ? `${Math.round(w.targetHr)} BPM` : `${Math.round((frac ?? 0) * 100)}%`;
         this.flash = {
           title: (s.label ?? s.kind).toUpperCase(),
-          text: frac !== undefined ? `${Math.round(frac * 100)}% · ${fmtClock(s.duration)}${s.erg ? '' : ' · ERG OFF'}` : `FREE RIDE · ${fmtClock(s.duration)}`,
-          tone: frac !== undefined && frac >= 1.05 ? 'alert' : undefined, until: now + 4,
+          text: frac !== undefined ? `${what} · ${fmtClock(s.duration)}${s.erg || run ? '' : ' · ERG OFF'}` : `${run ? 'FREE RUN' : 'FREE RIDE'} · ${fmtClock(s.duration)}`,
+          tone: (rt.runner.targetEffortAt(this.T) ?? 0) >= 1.05 ? 'alert' : undefined, until: now + 4,
         };
       }
     }
@@ -424,6 +485,10 @@ export class RideApp {
     this.stage.update({
       state, dt: wall, now, rider: live, ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, feel: fs, feelConfig: cfg, speed,
       anchors: this.world?.anchors ?? {}, showInserts: this.showInserts, flash: this.flash, nav, showSubtitles: this.cfg.subtitles,
+      run: this.sport === 'run' ? {
+        speed: live.speed, effort: fs.pct, units: this.cfg.units,
+        control: !!this.devices.treadmill?.controllable && this.devices.treadmillControl,
+      } : undefined,
     });
     if (this.audio && realtime) {
       this.audio.update({
@@ -431,6 +496,22 @@ export class RideApp {
       });
       if (this.playing) this.audio.feel(feelEvents, fs, cfg);
     }
+  }
+
+  /** Keyboard and slider control of the simulated runner. The effort slider scales effort, not speed. */
+  private applyRunnerControls(): void {
+    const sim = this.devices.simTreadmill;
+    if (!sim) return;
+    sim.setRunning(this.pedalling);
+    const th = this.cfg.thresholdSpeed;
+    if (this.freeRide) {
+      // A steady run, easing up the hills.
+      sim.setOverride(th * effortToPace(clamp(0.65 - this.freeRide.grade * 0.03, 0.4, 1) * this.effortScale));
+      return;
+    }
+    if (this.effortScale === 1) { sim.setOverride(null); return; }
+    const targetEffort = this.rt.runner.targetEffortAt(this.T) ?? 0.6;
+    sim.setOverride(th * effortToPace(targetEffort * this.effortScale));
   }
 
   /** Keyboard and slider control of the simulated rider. */
@@ -472,7 +553,8 @@ export class RideApp {
     }
     this.root.appendChild(jump);
     const simBox = bar.querySelector('[data-sim]') as HTMLElement;
-    simBox.hidden = this.devices.power?.info.kind !== 'sim';
+    simBox.hidden = this.sport === 'run' ? this.devices.belt?.info.kind !== 'sim' : this.devices.power?.info.kind !== 'sim';
+    if (this.sport === 'run') (bar.querySelector('[data-act="pedal"]') as HTMLElement).textContent = 'Stop running';
     simBox.style.display = simBox.hidden ? 'none' : 'contents';
     const label = (act: string, text: string) => { (bar.querySelector(`[data-act="${act}"]`) as HTMLElement).textContent = text; };
 
@@ -500,7 +582,8 @@ export class RideApp {
       },
       pedal: () => {
         this.pedalling = !this.pedalling;
-        label('pedal', this.pedalling ? 'Stop pedalling' : 'Start pedalling');
+        const verb = this.sport === 'run' ? 'running' : 'pedalling';
+        label('pedal', this.pedalling ? `Stop ${verb}` : `Start ${verb}`);
         (bar.querySelector('[data-act="pedal"]') as HTMLElement).classList.toggle('on', !this.pedalling);
       },
       full: () => {
@@ -566,7 +649,7 @@ export class RideApp {
     const ride = this.recorder.ride();
     if (ride.samples.length === 0) return undefined;
     this.lastFit = encodeFitActivity(ride, {
-      ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, productName: ENGINE_NAME,
+      ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, productName: ENGINE_NAME, sport: this.sport, thresholdSpeed: this.cfg.thresholdSpeed,
       utcOffsetSeconds: -new Date().getTimezoneOffset() * 60,
     });
     return this.lastFit;
@@ -577,13 +660,18 @@ export class RideApp {
     this.finished = true;
     this.playing = false;
     void this.audio?.setPlaying(false).catch(() => undefined);
-    void this.devices.trainer?.release().catch(() => undefined);
+    if (this.sport === 'run') void this.devices.treadmill?.release().catch(() => undefined);
+    else void this.devices.trainer?.release().catch(() => undefined);
+    this.unsubStopped?.();
     const samples = this.recorder.samples;
-    this.summary = samples.length ? summarise(samples, this.cfg.ftp, this.cfg.maxHr) : undefined;
+    this.summary = samples.length
+      ? summarise(samples, this.cfg.ftp, this.cfg.maxHr, { sport: this.sport, thresholdSpeed: this.cfg.thresholdSpeed, mass: this.cfg.weight })
+      : undefined;
     if (this.session) {
       const result: RideResult = {
         complete: this.complete, startTime: this.startTime, summary: this.summary, fit: this.fitBytes(),
-        flags: { ...(this.state?.flags ?? {}) }, simulated: this.devices.power?.info.kind === 'sim',
+        flags: { ...(this.state?.flags ?? {}) }, sport: this.sport,
+        simulated: this.sport === 'run' ? (this.devices.belt ?? this.devices.pod)?.info.kind === 'sim' : this.devices.power?.info.kind === 'sim',
       };
       const done = this.session.onFinish;
       this.dispose();
@@ -627,14 +715,22 @@ export class RideApp {
     let body: string;
     if (sm) {
       const total = sm.timeInPowerZones.reduce((a, b) => a + b, 0) || 1;
-      const sim = this.devices.power?.info.kind === 'sim';
-      body = `<div class="panel"><h2>Ride summary${sim ? ' · simulated rider' : ''}</h2><div class="stats">
-          ${stat(fmtClock(sm.duration), 'Duration')}${stat(String(Math.round(sm.normalisedPower)), 'Normalised power · W')}
-          ${stat(String(Math.round(sm.avgPower)), 'Average power · W')}${stat(String(Math.round(sm.kilojoules)), 'Work · kJ')}
+      const run = sm.sport === 'run';
+      const sim = run ? (this.devices.belt ?? this.devices.pod)?.info.kind === 'sim' : this.devices.power?.info.kind === 'sim';
+      const imperial = this.cfg.units === 'imperial';
+      const main = run
+        ? stat(imperial ? (sm.distance / 1609.344).toFixed(2) : (sm.distance / 1000).toFixed(2), imperial ? 'Distance · mi' : 'Distance · km')
+          + stat(formatPace(sm.avgSpeed, this.cfg.units), `Average pace · ${imperial ? '/mi' : '/km'}`)
+          + (sm.hasPower ? stat(String(Math.round(sm.avgPower)), 'Average running power · W') : '')
+          + (sm.avgCadence ? stat(String(Math.round(sm.avgCadence)), 'Average cadence · spm') : '')
+        : stat(String(Math.round(sm.normalisedPower)), 'Normalised power · W') + stat(String(Math.round(sm.avgPower)), 'Average power · W')
+          + stat(String(Math.round(sm.kilojoules)), 'Work · kJ');
+      body = `<div class="panel"><h2>${run ? 'Run' : 'Ride'} summary${sim ? (run ? ' · simulated runner' : ' · simulated rider') : ''}</h2><div class="stats">
+          ${stat(fmtClock(sm.duration), 'Duration')}${main}
           ${sm.avgHeartRate ? stat(String(Math.round(sm.avgHeartRate)), 'Average heart rate') + stat(String(Math.round(sm.maxHeartRate ?? 0)), 'Max heart rate') : ''}
           ${stat(sm.intensityFactor.toFixed(2), 'Intensity factor')}${stat(String(Math.round(sm.trainingStress)), 'Training stress')}
         </div></div>
-        <div class="panel"><h2>Time in power zones</h2>
+        <div class="panel"><h2>Time in ${run ? 'effort' : 'power'} zones</h2>
           <div class="zones">${sm.timeInPowerZones.map((s, i) => `<i style="width:${(s / total) * 100}%;background:${zoneColour([0.5, 0.65, 0.8, 0.95, 1.1, 1.3, 1.6][i])}"></i>`).join('')}</div>
           <div class="zonekey">${sm.timeInPowerZones.map((s, i) => `<span><i style="background:${zoneColour([0.5, 0.65, 0.8, 0.95, 1.1, 1.3, 1.6][i])}"></i>Z${i + 1} ${POWER_ZONE_NAMES[i]} · ${fmtClock(s)}</span>`).join('')}</div>
         </div>

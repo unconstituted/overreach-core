@@ -1,19 +1,23 @@
 import '../ui.css';
 import { DeviceManager } from '../../devices';
+import { formatPace } from '../../core/workout';
 import { mountDevicePanel } from '../devicePanel';
 
-/** Device test page: switch between Sim and Bluetooth, watch live data, drive ERG by hand. */
-const devices = new DeviceManager({ ftp: 250 });
+/**
+ * Device test page: switch between Sim and Bluetooth, watch live data, drive
+ * ERG (or the treadmill's speed and incline) by hand.
+ */
+const devices = new DeviceManager({ ftp: 250, thresholdSpeed: 1000 / 300 });
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 document.body.innerHTML = `
 <div class="wrap">
   <div>
     <h1>Device test</h1>
-    <p class="dim">Check a trainer and heart-rate strap before a ride. <a href="./index.html">Back to Overreach</a></p>
+    <p class="dim">Check a trainer, treadmill, footpod or heart-rate strap before a session. <a href="./index.html">Back to Overreach</a></p>
   </div>
   <div class="panel" id="devices"></div>
-  <div class="panel">
+  <div class="panel" data-bike>
     <h2>Live</h2>
     <div class="stats">
       <div class="stat"><span class="big" id="power">0</span><span class="unit">Watts</span></div>
@@ -23,7 +27,38 @@ document.body.innerHTML = `
     </div>
     <canvas class="trace" id="trace" width="940" height="160" aria-label="Power over the last two minutes"></canvas>
   </div>
-  <div class="panel">
+  <div class="panel" data-run hidden>
+    <h2>Live</h2>
+    <div class="stats">
+      <div class="stat"><span class="big" id="rspeed">0.0</span><span class="unit">Speed km/h</span></div>
+      <div class="stat"><span class="big" id="rpace">–:––</span><span class="unit">Pace /km</span></div>
+      <div class="stat"><span class="big" id="rincline">0.0</span><span class="unit">Incline %</span></div>
+      <div class="stat"><span class="big" id="rcad">0</span><span class="unit">Cadence spm</span></div>
+      <div class="stat"><span class="big" id="rpower">–</span><span class="unit">Running power W</span></div>
+      <div class="stat"><span class="big" id="rheart">–</span><span class="unit">Heart rate bpm</span></div>
+    </div>
+  </div>
+  <div class="panel" data-run hidden>
+    <h2>Treadmill control</h2>
+    <p class="small dim">Keep the safety key on and the stop button in reach. The page never restarts a belt you have stopped: press Carry on first.</p>
+    <div class="row">
+      <button id="belt">Start belt</button>
+      <button id="carry" hidden>Carry on</button>
+      <label class="grow">Speed: <span id="tspeedValue">8.0 km/h</span>
+        <input type="range" id="tspeed" min="2" max="20" step="0.1" value="8"></label>
+      <label class="grow">Incline: <span id="tinclineValue">0.0%</span>
+        <input type="range" id="tincline" min="0" max="10" step="0.5" value="0"></label>
+    </div>
+    <p class="small dim" id="tnote"></p>
+  </div>
+  <div class="panel" id="runPanel" data-run hidden>
+    <h2>Simulated runner</h2>
+    <div class="row">
+      <button id="running" class="on" aria-pressed="true">Running</button>
+      <span class="small dim">Stopping is the runner pressing the treadmill's stop button.</span>
+    </div>
+  </div>
+  <div class="panel" data-bike>
     <h2>Trainer control</h2>
     <div class="row">
       <button id="erg" class="on" aria-pressed="true">ERG on</button>
@@ -33,7 +68,7 @@ document.body.innerHTML = `
     </div>
     <p class="small dim" id="controlNote"></p>
   </div>
-  <div class="panel" id="simPanel">
+  <div class="panel" id="simPanel" data-bike>
     <h2>Simulated rider</h2>
     <div class="row">
       <button id="pedal" class="on" aria-pressed="true">Pedalling</button>
@@ -53,7 +88,30 @@ let ergTarget = 150;
 let manual: number | null = null;
 let pedalling = true;
 
+let belt = false;
+let tspeed = 8;
+let tincline = 0;
+let running = true;
+
 const sync = () => {
+  const run = devices.sport === 'run';
+  document.querySelectorAll<HTMLElement>('[data-run]').forEach((el) => { el.hidden = !run; });
+  document.querySelectorAll<HTMLElement>('[data-bike]').forEach((el) => { el.hidden = run; });
+  $('runPanel').hidden = !run || !devices.simTreadmill;
+  const stopped = !!devices.treadmill?.stoppedByRunner;
+  if (stopped) belt = false;
+  $('belt').textContent = belt ? 'Stop belt' : 'Start belt';
+  $('belt').classList.toggle('on', belt);
+  ($('belt') as HTMLButtonElement).disabled = stopped || !devices.treadmill?.controllable;
+  $('carry').hidden = !stopped;
+  $('tspeedValue').textContent = `${tspeed.toFixed(1)} km/h (${formatPace(tspeed / 3.6)} /km)`;
+  $('tinclineValue').textContent = `${tincline.toFixed(1)}%`;
+  $('running').textContent = running ? 'Running' : 'Stopped';
+  $('running').classList.toggle('on', running);
+  $('tnote').textContent = !devices.belt ? 'No treadmill: speed comes from the footpod.'
+    : stopped ? 'You stopped the belt. Press Carry on, then Start belt.'
+      : devices.treadmill?.controllable ? '' : 'This treadmill only reports; set the speed on its console.';
+  devices.simTreadmill?.setRunning(running);
   $('erg').classList.toggle('on', erg);
   $('erg').textContent = erg ? 'ERG on' : 'ERG off';
   $('erg').setAttribute('aria-pressed', String(erg));
@@ -73,6 +131,15 @@ const sync = () => {
 };
 
 $('erg').onclick = () => { erg = !erg; sync(); };
+$('belt').onclick = () => {
+  belt = !belt;
+  if (!belt) void devices.stopBelt(false);
+  sync();
+};
+$('carry').onclick = () => { devices.resumeBelt(); sync(); };
+($('tspeed') as HTMLInputElement).oninput = (e) => { tspeed = Number((e.target as HTMLInputElement).value); sync(); };
+($('tincline') as HTMLInputElement).oninput = (e) => { tincline = Number((e.target as HTMLInputElement).value); sync(); };
+$('running').onclick = () => { running = !running; sync(); };
 ($('ergTarget') as HTMLInputElement).oninput = (e) => { ergTarget = Number((e.target as HTMLInputElement).value); sync(); };
 $('pedal').onclick = () => { pedalling = !pedalling; sync(); };
 $('follow').onclick = () => { manual = null; sync(); };
@@ -100,6 +167,20 @@ let sinceSample = 0;
 function frame(now: number): void {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
+  if (devices.sport === 'run') {
+    if (belt) devices.applyRunTarget(tspeed / 3.6, tincline);
+    else devices.simTreadmill?.setRunnerTarget(tspeed / 3.6);
+    devices.tick(dt);
+    const l = devices.live;
+    $('rspeed').textContent = (l.speed * 3.6).toFixed(1);
+    $('rpace').textContent = formatPace(l.speed);
+    $('rincline').textContent = l.incline.toFixed(1);
+    $('rcad').textContent = String(Math.round(l.cadence));
+    $('rpower').textContent = l.power ? String(Math.round(l.power)) : '–';
+    $('rheart').textContent = l.heartRate ? String(Math.round(l.heartRate)) : '–';
+    requestAnimationFrame(frame);
+    return;
+  }
   devices.applyTarget(ergTarget, erg);
   devices.tick(dt);
   $('power').textContent = String(Math.round(devices.live.power));
