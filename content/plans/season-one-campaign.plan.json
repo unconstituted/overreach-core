@@ -1,0 +1,175 @@
+{
+  "$schema": "../../schemas/plan.schema.json",
+  "format": 1,
+  "id": "season-one-campaign",
+  "title": "Season 1 Campaign",
+  "description": "Four weeks built around the Season 1 chapters. The chapters are the hard days; everything between them gets you ready for the next one.",
+  "sport": "bike",
+  "level": "intermediate",
+  "goal": "Ride Season 1 with the legs for it",
+  "hoursPerWeek": [
+    3,
+    4
+  ],
+  "style": "story",
+  "season": "season-1",
+  "weeks": [
+    {
+      "title": "The Disaster",
+      "focus": "Chapter 1",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:long-haul",
+              "note": "An easy start. Chapter 1 is in two days."
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "chapter:ch1"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Aftermath",
+      "focus": "Short, sharp efforts",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:ring-runs",
+              "alternatives": [
+                "workout:convoy-pace"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "sessions": [
+            {
+              "ref": "workout:station-keeping"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Preparation",
+      "focus": "Holding a number",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:hold-the-line",
+              "alternatives": [
+                "workout:station-keeping"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "sessions": [
+            {
+              "ref": "workout:burn-windows",
+              "alternatives": [
+                "workout:ring-runs"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol",
+              "optional": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "The Clamp",
+      "focus": "Test chapter",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:convoy-pace"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "sessions": [
+            {
+              "ref": "chapter:test-clamp",
+              "note": "Hold the band and the clamp locks. Miss it and the story remembers."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

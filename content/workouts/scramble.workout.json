@@ -1,0 +1,60 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "scramble",
+  "title": "Scramble",
+  "description": "Eight all-out twelve-second sprints from a rolling start. The alarm goes; you go.",
+  "sport": "bike",
+  "focus": "sprint",
+  "difficulty": 4,
+  "tags": [
+    "sprint",
+    "neuromuscular"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 600,
+      "from": 0.45,
+      "to": 0.75,
+      "label": "Systems warm",
+      "intensity": "warmup"
+    },
+    {
+      "kind": "steady",
+      "duration": 300,
+      "power": 0.7,
+      "label": "Stand by"
+    },
+    {
+      "kind": "intervals",
+      "repeat": 8,
+      "on": {
+        "duration": 12,
+        "power": 1.8,
+        "label": "Scramble",
+        "cadence": 110
+      },
+      "off": {
+        "duration": 168,
+        "power": 0.5,
+        "label": "Stand down"
+      },
+      "erg": false
+    },
+    {
+      "kind": "steady",
+      "duration": 300,
+      "power": 0.6,
+      "label": "Debrief"
+    },
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.6,
+      "to": 0.4,
+      "label": "Power down",
+      "intensity": "cooldown"
+    }
+  ]
+}

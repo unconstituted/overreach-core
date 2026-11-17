@@ -1,0 +1,45 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "station-keeping",
+  "title": "Station Keeping",
+  "description": "Three twelve-minute blocks just under threshold. Holding position against a current that never lets up.",
+  "sport": "bike",
+  "focus": "sweetspot",
+  "difficulty": 3,
+  "tags": [
+    "sweet spot"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 600,
+      "from": 0.45,
+      "to": 0.75,
+      "label": "Systems warm",
+      "intensity": "warmup"
+    },
+    {
+      "kind": "intervals",
+      "repeat": 3,
+      "on": {
+        "duration": 720,
+        "power": 0.9,
+        "label": "Hold station"
+      },
+      "off": {
+        "duration": 240,
+        "power": 0.55,
+        "label": "Ease"
+      }
+    },
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.6,
+      "to": 0.4,
+      "label": "Power down",
+      "intensity": "cooldown"
+    }
+  ]
+}

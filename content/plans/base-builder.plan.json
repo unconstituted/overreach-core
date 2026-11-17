@@ -1,0 +1,330 @@
+{
+  "$schema": "../../schemas/plan.schema.json",
+  "format": 1,
+  "id": "base-builder",
+  "title": "Base Builder",
+  "description": "Eight weeks of steady work: endurance first, then tempo, then threshold, with a recovery week in the middle and a test at each end. Three or four rides a week.",
+  "sport": "bike",
+  "level": "beginner",
+  "goal": "Build aerobic fitness and raise FTP",
+  "hoursPerWeek": [
+    3,
+    4.5
+  ],
+  "style": "calendar",
+  "weeks": [
+    {
+      "title": "Week 1",
+      "focus": "Settle in",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:convoy-pace",
+              "alternatives": [
+                "workout:long-haul"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 2",
+      "focus": "Add tempo",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:convoy-pace"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 3",
+      "focus": "Just under threshold",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:station-keeping",
+              "alternatives": [
+                "workout:convoy-pace"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "sessions": [
+            {
+              "ref": "workout:convoy-pace"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 4",
+      "focus": "Recover",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:systems-check",
+              "note": "Re-test. Update your FTP in Profile afterwards."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 5",
+      "focus": "Build",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:station-keeping"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "sessions": [
+            {
+              "ref": "workout:convoy-pace"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 6",
+      "focus": "Threshold",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:hold-the-line",
+              "alternatives": [
+                "workout:station-keeping"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "sessions": [
+            {
+              "ref": "workout:station-keeping"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 7",
+      "focus": "Peak week",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:gravity-well",
+              "alternatives": [
+                "workout:station-keeping"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul"
+            }
+          ]
+        },
+        {
+          "day": 4,
+          "sessions": [
+            {
+              "ref": "workout:hold-the-line"
+            }
+          ]
+        },
+        {
+          "day": 5,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:outer-marker-patrol"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Week 8",
+      "focus": "Ease and test",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:convoy-pace"
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin"
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "workout:systems-check",
+              "note": "Final test. See what eight weeks bought you."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

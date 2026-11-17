@@ -1,0 +1,49 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "systems-check",
+  "title": "Systems Check",
+  "description": "A ramp to failure for setting your FTP. It gets harder every minute until you cannot hold it. Your FTP is roughly 75% of your best minute.",
+  "sport": "bike",
+  "focus": "test",
+  "difficulty": 5,
+  "tags": [
+    "ftp test"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.4,
+      "to": 0.5,
+      "label": "Pre-flight",
+      "intensity": "warmup"
+    },
+    {
+      "kind": "ramp",
+      "duration": 1200,
+      "from": 0.5,
+      "to": 1.5,
+      "label": "Ramp",
+      "erg": true,
+      "texts": [
+        {
+          "offset": 0,
+          "message": "Hold on as long as you can. Stop when the cadence falls apart."
+        },
+        {
+          "offset": 600,
+          "message": "This is threshold. From here it counts."
+        }
+      ]
+    },
+    {
+      "kind": "ramp",
+      "duration": 600,
+      "from": 0.6,
+      "to": 0.4,
+      "label": "Power down",
+      "intensity": "cooldown"
+    }
+  ]
+}

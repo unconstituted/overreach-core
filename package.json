@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "validate": "tsx tools/validate-chapters.ts",
     "ride-script": "tsx tools/ride-script-to-chapter.ts",
-    "check:ride": "npm run build && node tools/ride-check.mjs"
+    "check:ride": "npm run build && node tools/ride-check.mjs",
+    "catalogue": "tsx tools/build-catalogue.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

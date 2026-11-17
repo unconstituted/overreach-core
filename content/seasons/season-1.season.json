@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/season.schema.json",
+  "format": 1,
+  "id": "season-1",
+  "title": "The Dark Segment",
+  "number": 1,
+  "description": "A routine race day at Meridian Station ends with the station gone and one pilot down on the ice. What was the gate, and who opened it?",
+  "chapters": [
+    {
+      "id": "ch1"
+    },
+    {
+      "id": "test-clamp"
+    }
+  ],
+  "flags": [
+    "clampLocked",
+    "capsuleFree"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "storm-front",
+  "title": "Storm Front",
+  "description": "An hour through the storm world: tempo with gusts, loaded from a Zwift workout file with its own text cues.",
+  "sport": "bike",
+  "focus": "mixed",
+  "difficulty": 4,
+  "tags": [
+    "zwo",
+    "mixed"
+  ],
+  "file": "storm-front.zwo"
+}

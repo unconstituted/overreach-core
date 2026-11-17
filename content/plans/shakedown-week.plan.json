@@ -1,0 +1,52 @@
+{
+  "$schema": "../../schemas/plan.schema.json",
+  "format": 1,
+  "id": "shakedown-week",
+  "title": "Shakedown Week",
+  "description": "Three rides in seven days to learn the controls: one easy, one steady, and the first chapter. A sampler before you commit to anything longer.",
+  "sport": "bike",
+  "level": "beginner",
+  "goal": "Try the game and a training week",
+  "hoursPerWeek": [
+    2,
+    2.5
+  ],
+  "style": "calendar",
+  "weeks": [
+    {
+      "title": "Shakedown",
+      "focus": "Find your feet",
+      "days": [
+        {
+          "day": 1,
+          "sessions": [
+            {
+              "ref": "workout:dock-spin",
+              "note": "Check your FTP feels right. If this is not easy, lower it."
+            }
+          ]
+        },
+        {
+          "day": 3,
+          "sessions": [
+            {
+              "ref": "workout:long-haul",
+              "alternatives": [
+                "workout:dock-spin"
+              ]
+            }
+          ]
+        },
+        {
+          "day": 6,
+          "sessions": [
+            {
+              "ref": "chapter:ch1",
+              "note": "Chapter 1. Thirty-five minutes; the surges are short."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

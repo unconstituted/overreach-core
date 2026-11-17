@@ -1,0 +1,77 @@
+{
+  "$schema": "../../schemas/map.schema.json",
+  "format": 1,
+  "id": "meridian-approach",
+  "title": "Meridian Approach",
+  "description": "Open space on the approach lanes to Meridian Station. Flat, fast and empty: a place to turn the legs and watch the stars go by.",
+  "use": [
+    "freeRide"
+  ],
+  "length": 20000,
+  "profile": [
+    [
+      0,
+      0
+    ],
+    [
+      20000,
+      0
+    ]
+  ],
+  "image": "ch1/images/s05.jpg",
+  "scene": {
+    "id": "space",
+    "speedScale": 40,
+    "camera": "cockpit",
+    "fov": [
+      70,
+      96
+    ],
+    "env": {
+      "top": [
+        0.008,
+        0.01,
+        0.03
+      ],
+      "bot": [
+        0.02,
+        0.02,
+        0.06
+      ],
+      "fog": [
+        0,
+        0,
+        0
+      ],
+      "density": 0,
+      "stars": 1,
+      "planetRadius": 0.2,
+      "planetDir": [
+        0.55,
+        0.2,
+        -1
+      ],
+      "night": 0,
+      "haze": 0,
+      "sun": 1
+    },
+    "streaks": {
+      "length": 9000,
+      "spreadX": 1500,
+      "spreadY": 900,
+      "y0": 0,
+      "stretch": 0.06,
+      "maxStretch": 5000,
+      "alpha": 0.9,
+      "alphaSpeedRef": 0,
+      "color": [
+        0.7,
+        0.85,
+        1
+      ]
+    }
+  },
+  "unlock": {
+    "type": "always"
+  }
+}

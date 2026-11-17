@@ -1,0 +1,129 @@
+{
+  "$schema": "../../schemas/map.schema.json",
+  "format": 1,
+  "id": "terror-flats",
+  "title": "Terror Flats",
+  "description": "Low over the ice plains of Terror. Long false flats and three pressure ridges that the trainer will make you feel.",
+  "use": [
+    "freeRide"
+  ],
+  "length": 15000,
+  "profile": [
+    [
+      0,
+      0
+    ],
+    [
+      2000,
+      0.5
+    ],
+    [
+      3000,
+      3
+    ],
+    [
+      3800,
+      4.5
+    ],
+    [
+      4200,
+      -2
+    ],
+    [
+      5200,
+      0
+    ],
+    [
+      7000,
+      1
+    ],
+    [
+      8000,
+      5
+    ],
+    [
+      8600,
+      6
+    ],
+    [
+      9200,
+      -3
+    ],
+    [
+      10500,
+      0
+    ],
+    [
+      12000,
+      1.5
+    ],
+    [
+      13000,
+      4
+    ],
+    [
+      13600,
+      -1
+    ],
+    [
+      15000,
+      0
+    ]
+  ],
+  "image": "ch1/images/s09.jpg",
+  "scene": {
+    "id": "ice",
+    "speedScale": 14,
+    "camera": "cockpit",
+    "fov": [
+      72,
+      100
+    ],
+    "env": {
+      "top": [
+        0.2,
+        0.3,
+        0.68
+      ],
+      "bot": [
+        0.78,
+        0.85,
+        0.98
+      ],
+      "fog": [
+        0.76,
+        0.83,
+        0.97
+      ],
+      "density": 0.00011,
+      "stars": 0.15,
+      "planetRadius": 0.66,
+      "planetDir": [
+        0.2,
+        0.52,
+        -1
+      ],
+      "night": 0,
+      "haze": 0.3,
+      "sun": 1
+    },
+    "streaks": {
+      "length": 1800,
+      "spreadX": 420,
+      "spreadY": 60,
+      "y0": 62,
+      "stretch": 0.045,
+      "alpha": 0.5,
+      "alphaSpeedRef": 60,
+      "color": [
+        0.9,
+        0.95,
+        1
+      ]
+    }
+  },
+  "unlock": {
+    "type": "chapterCompleted",
+    "chapter": "ch1"
+  }
+}

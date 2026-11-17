@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://overreach.game/schemas/plan.schema.json",
+  "title": "Overreach training plan",
+  "description": "Weeks of days of sessions. Sessions point at workouts or chapters.",
+  "type": "object",
+  "required": [
+    "format",
+    "id",
+    "title",
+    "description",
+    "sport",
+    "level",
+    "goal",
+    "hoursPerWeek",
+    "style",
+    "weeks"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "format": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "sport": {
+      "enum": [
+        "bike",
+        "run"
+      ]
+    },
+    "level": {
+      "enum": [
+        "beginner",
+        "intermediate",
+        "advanced"
+      ]
+    },
+    "goal": {
+      "type": "string"
+    },
+    "hoursPerWeek": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "style": {
+      "enum": [
+        "calendar",
+        "story"
+      ]
+    },
+    "season": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "unlock": {
+      "$ref": "#/$defs/unlock"
+    },
+    "weeks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "days"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "focus": {
+            "type": "string"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "day",
+                "sessions"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "day": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 7,
+                  "description": "Day of the plan week. Day 1 is the day the plan starts."
+                },
+                "sessions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "ref"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "pattern": "^(workout|chapter):[a-z0-9][a-z0-9-]*$",
+                        "description": "workout:<id> or chapter:<id>"
+                      },
+                      "optional": {
+                        "type": "boolean"
+                      },
+                      "alternatives": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^(workout|chapter):[a-z0-9][a-z0-9-]*$",
+                          "description": "workout:<id> or chapter:<id>"
+                        }
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "unlock": {
+      "description": "When this becomes available. See docs/AUTHORING.md.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "always"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "chapterCompleted"
+            },
+            "chapter": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          },
+          "required": [
+            "type",
+            "chapter"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "flag"
+            },
+            "season": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "flag": {
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "season",
+            "flag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "totalDistance"
+            },
+            "km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "type",
+            "km"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "totalTime"
+            },
+            "hours": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "type",
+            "hours"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "planWeek"
+            },
+            "week": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "plan": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          },
+          "required": [
+            "type",
+            "week"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "all",
+                "any"
+              ]
+            },
+            "rules": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/unlock"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "rules"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

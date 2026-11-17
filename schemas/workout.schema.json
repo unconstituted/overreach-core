@@ -1,0 +1,507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://overreach.game/schemas/workout.schema.json",
+  "title": "Overreach workout",
+  "description": "A standalone session: inline steps, or a .zwo or .fit file with this metadata beside it.",
+  "type": "object",
+  "required": [
+    "format",
+    "id",
+    "title",
+    "focus",
+    "difficulty"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "format": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "sport": {
+      "enum": [
+        "bike",
+        "run"
+      ]
+    },
+    "focus": {
+      "enum": [
+        "recovery",
+        "endurance",
+        "tempo",
+        "sweetspot",
+        "threshold",
+        "vo2",
+        "anaerobic",
+        "sprint",
+        "mixed",
+        "test"
+      ]
+    },
+    "difficulty": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "file": {
+      "type": "string",
+      "pattern": "\\.(zwo|fit)$",
+      "description": "A .zwo or .fit file next to this one."
+    }
+  },
+  "$defs": {
+    "unlock": {
+      "description": "When this becomes available. See docs/AUTHORING.md.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "always"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "chapterCompleted"
+            },
+            "chapter": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          },
+          "required": [
+            "type",
+            "chapter"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "flag"
+            },
+            "season": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "flag": {
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "season",
+            "flag"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "totalDistance"
+            },
+            "km": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "type",
+            "km"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "totalTime"
+            },
+            "hours": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "type",
+            "hours"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "planWeek"
+            },
+            "week": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "plan": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            }
+          },
+          "required": [
+            "type",
+            "week"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "enum": [
+                "all",
+                "any"
+              ]
+            },
+            "rules": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/unlock"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "rules"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "steady"
+            },
+            "duration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "power": {
+              "type": "number",
+              "description": "Fraction of FTP (1.0 = FTP)."
+            },
+            "watts": {
+              "type": "number"
+            },
+            "cadence": {
+              "type": "number"
+            },
+            "label": {
+              "type": "string"
+            },
+            "erg": {
+              "type": "boolean"
+            },
+            "intensity": {
+              "enum": [
+                "warmup",
+                "active",
+                "recovery",
+                "rest",
+                "cooldown",
+                "interval"
+              ]
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "duration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "ramp"
+            },
+            "duration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "from": {
+              "type": "number"
+            },
+            "to": {
+              "type": "number"
+            },
+            "unit": {
+              "enum": [
+                "ftp",
+                "watts"
+              ]
+            },
+            "cadence": {
+              "type": "number"
+            },
+            "label": {
+              "type": "string"
+            },
+            "erg": {
+              "type": "boolean"
+            },
+            "intensity": {
+              "enum": [
+                "warmup",
+                "active",
+                "recovery",
+                "rest",
+                "cooldown",
+                "interval"
+              ]
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "duration",
+            "from",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "free"
+            },
+            "duration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "cadence": {
+              "type": "number"
+            },
+            "label": {
+              "type": "string"
+            },
+            "intensity": {
+              "enum": [
+                "warmup",
+                "active",
+                "recovery",
+                "rest",
+                "cooldown",
+                "interval"
+              ]
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "duration"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "intervals"
+            },
+            "repeat": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "on": {
+              "type": "object",
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "power": {
+                  "type": "number",
+                  "description": "Fraction of FTP (1.0 = FTP)."
+                },
+                "watts": {
+                  "type": "number"
+                },
+                "cadence": {
+                  "type": "number"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "duration"
+              ],
+              "additionalProperties": false
+            },
+            "off": {
+              "type": "object",
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "power": {
+                  "type": "number",
+                  "description": "Fraction of FTP (1.0 = FTP)."
+                },
+                "watts": {
+                  "type": "number"
+                },
+                "cadence": {
+                  "type": "number"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "duration"
+              ],
+              "additionalProperties": false
+            },
+            "erg": {
+              "type": "boolean"
+            },
+            "texts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "offset": {
+                    "type": "number"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "offset",
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "repeat",
+            "on",
+            "off"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

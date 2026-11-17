@@ -1,0 +1,85 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "gravity-well",
+  "title": "Gravity Well",
+  "description": "Over-unders: two minutes just under threshold, one minute over, three times through, three sets. You never quite climb out.",
+  "sport": "bike",
+  "focus": "threshold",
+  "difficulty": 4,
+  "tags": [
+    "over-unders"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 600,
+      "from": 0.45,
+      "to": 0.75,
+      "label": "Systems warm",
+      "intensity": "warmup"
+    },
+    {
+      "kind": "intervals",
+      "repeat": 3,
+      "on": {
+        "duration": 120,
+        "power": 0.92,
+        "label": "Under"
+      },
+      "off": {
+        "duration": 60,
+        "power": 1.06,
+        "label": "Over"
+      }
+    },
+    {
+      "kind": "steady",
+      "duration": 300,
+      "power": 0.5,
+      "label": "Float"
+    },
+    {
+      "kind": "intervals",
+      "repeat": 3,
+      "on": {
+        "duration": 120,
+        "power": 0.92,
+        "label": "Under"
+      },
+      "off": {
+        "duration": 60,
+        "power": 1.06,
+        "label": "Over"
+      }
+    },
+    {
+      "kind": "steady",
+      "duration": 300,
+      "power": 0.5,
+      "label": "Float"
+    },
+    {
+      "kind": "intervals",
+      "repeat": 3,
+      "on": {
+        "duration": 120,
+        "power": 0.92,
+        "label": "Under"
+      },
+      "off": {
+        "duration": 60,
+        "power": 1.06,
+        "label": "Over"
+      }
+    },
+    {
+      "kind": "ramp",
+      "duration": 420,
+      "from": 0.6,
+      "to": 0.4,
+      "label": "Power down",
+      "intensity": "cooldown"
+    }
+  ]
+}

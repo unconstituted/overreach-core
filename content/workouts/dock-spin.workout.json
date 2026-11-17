@@ -1,0 +1,45 @@
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "dock-spin",
+  "title": "Dock Spin",
+  "description": "Thirty easy minutes. Legs turning, nothing more. The ship does not need you today; your legs need this.",
+  "sport": "bike",
+  "focus": "recovery",
+  "difficulty": 1,
+  "tags": [
+    "easy",
+    "short"
+  ],
+  "steps": [
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.4,
+      "to": 0.55,
+      "label": "Undock",
+      "intensity": "warmup"
+    },
+    {
+      "kind": "steady",
+      "duration": 1200,
+      "power": 0.55,
+      "label": "Idle drift",
+      "cadence": 90,
+      "texts": [
+        {
+          "offset": 600,
+          "message": "Halfway. If this feels hard, it is too hard."
+        }
+      ]
+    },
+    {
+      "kind": "ramp",
+      "duration": 300,
+      "from": 0.6,
+      "to": 0.4,
+      "label": "Power down",
+      "intensity": "cooldown"
+    }
+  ]
+}

@@ -5,6 +5,7 @@
  * Usage: npm run validate            (all of chapters/*.chapter.json)
  *        npx tsx tools/validate-chapters.ts chapters/ch2.chapter.json
  */
+import { loadContent } from './content';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
@@ -49,4 +50,11 @@ for (const file of files) {
     console.log(`✓ ${file}`);
   }
 }
+
+// Everything in content/: schemas, then cross-references through the catalogue build.
+const report = loadContent('.');
+for (const [f, p] of Object.entries(report.files)) {
+  if (p.length) { failed++; console.log(`✗ ${f}\n${p.map((x) => `    ${x}`).join('\n')}`); } else console.log(`✓ ${f}`);
+}
+for (const p of report.problems) { failed++; console.log(`✗ ${p}`); }
 process.exit(failed ? 1 : 0);
