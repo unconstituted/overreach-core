@@ -1,4 +1,4 @@
-import { type TextEvent, type Workout, type WorkoutStep, WorkoutError } from './model';
+import { DEFAULT_MAX_HR, DEFAULT_THRESHOLD_SPEED, type TargetUnit, type TextEvent, type Workout, type WorkoutStep, WorkoutError } from './model';
 import { child, encodeEntities, parseXml, type XmlNode } from './xml';
 
 function num(node: XmlNode, ...names: string[]): number | undefined {
@@ -44,6 +44,8 @@ export function parseZwo(xml: string): Workout {
   const body = child(file, 'workout');
   if (!body) throw new WorkoutError('Not a .zwo file: no <workout> element');
   const sportText = (child(file, 'sportType')?.text ?? 'bike').trim().toLowerCase();
+  // In Zwift run workouts the "Power" attributes are fractions of threshold pace.
+  const U: TargetUnit = sportText === 'run' ? 'pace' : 'ftp';
 
   const steps: WorkoutStep[] = [];
   let setIndex = 0;
@@ -53,7 +55,7 @@ export function parseZwo(xml: string): Workout {
       case 'SteadyState': {
         const p = need(el, 'Power', 'PowerLow');
         steps.push({
-          kind: 'steady', duration: need(el, 'Duration'), target: { unit: 'ftp', from: p, to: p },
+          kind: 'steady', duration: need(el, 'Duration'), target: { unit: U, from: p, to: p },
           cadence, erg: true, texts: texts(el),
         });
         break;
@@ -65,7 +67,7 @@ export function parseZwo(xml: string): Workout {
         const to = num(el, 'PowerHigh') ?? from;
         steps.push({
           kind: from === to ? 'steady' : 'ramp', duration: need(el, 'Duration'),
-          target: { unit: 'ftp', from, to }, cadence, erg: true,
+          target: { unit: U, from, to }, cadence, erg: true,
           intensity: el.name === 'Warmup' ? 'warmup' : el.name === 'Cooldown' ? 'cooldown' : undefined,
           texts: texts(el),
         });
@@ -87,7 +89,7 @@ export function parseZwo(xml: string): Workout {
             const p = phase === 'on' ? onP : offP;
             if (d > 0) {
               steps.push({
-                kind: 'steady', duration: d, target: { unit: 'ftp', from: p, to: p },
+                kind: 'steady', duration: d, target: { unit: U, from: p, to: p },
                 cadence: phase === 'on' ? onCad : offCad, erg: true,
                 intensity: phase === 'on' ? 'interval' : 'recovery',
                 texts: all.filter((t) => t.offset >= setT && t.offset < setT + d).map((t) => ({ ...t, offset: t.offset - setT })),
@@ -123,9 +125,20 @@ function f(n: number): string {
   return String(Math.round(n * 1000) / 1000);
 }
 
-/** Write a workout as .zwo. Watt targets need an FTP to convert to fractions. */
-export function writeZwo(w: Workout, ftp = 250): string {
-  const frac = (v: number, unit: 'ftp' | 'watts') => f(unit === 'ftp' ? v : v / ftp);
+/**
+ * Write a workout as .zwo. Absolute targets are converted to fractions with
+ * the given references. Zwift has no heart-rate targets, so those are written
+ * as a fraction of threshold heart rate (about 90% of maximum), which is the
+ * nearest equivalent effort.
+ */
+export function writeZwo(w: Workout, ftp = 250, thresholdSpeed = DEFAULT_THRESHOLD_SPEED, maxHr = DEFAULT_MAX_HR): string {
+  const frac = (v: number, unit: TargetUnit) => f(
+    unit === 'ftp' || unit === 'pace' ? v
+      : unit === 'watts' ? v / ftp
+        : unit === 'speed' ? v / thresholdSpeed
+          : unit === 'hr' ? v / 0.9
+            : v / maxHr / 0.9,
+  );
   const lines: string[] = ['<workout_file>'];
   if (w.author) lines.push(`  <author>${encodeEntities(w.author)}</author>`);
   lines.push(`  <name>${encodeEntities(w.name)}</name>`);

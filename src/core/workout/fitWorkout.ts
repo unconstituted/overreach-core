@@ -1,11 +1,15 @@
 import { BaseType, decodeFit, FitWriter, Mesg, messagesOf } from '../fit';
-import { type Intensity, type PowerTarget, type Workout, type WorkoutStep, WorkoutError } from './model';
+import {
+  DEFAULT_MAX_HR, DEFAULT_THRESHOLD_SPEED, toAbsolute, type Intensity, type PowerTarget, type Workout, type WorkoutStep, WorkoutError,
+} from './model';
 
 const INTENSITY: Intensity[] = ['active', 'rest', 'warmup', 'cooldown', 'recovery', 'interval'];
 
 const DURATION_TIME = 0;
 const DURATION_OPEN = 5;
 const DURATION_REPEAT = 6;
+const TARGET_SPEED = 0;
+const TARGET_HR = 1;
 const TARGET_OPEN = 2;
 const TARGET_CADENCE = 3;
 const TARGET_POWER = 4;
@@ -14,6 +18,18 @@ const TARGET_POWER = 4;
 const ZONE_RANGES: [number, number][] = [
   [0.45, 0.55], [0.56, 0.75], [0.76, 0.9], [0.91, 1.05], [1.06, 1.2], [1.21, 1.5], [1.5, 2.0],
 ];
+
+/** Heart-rate zones as fractions of maximum, for steps that name a zone (1 to 5). */
+const HR_ZONES: [number, number][] = [[0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 1.0]];
+
+/** FIT custom heart-rate values: 0 to 100 are % of maximum; above 100 are bpm + 100. */
+function hrRange(low: number, high: number): PowerTarget {
+  const isBpm = low > 100 || high > 100;
+  const lo = isBpm ? low - 100 : low / 100;
+  const hi = isBpm ? high - 100 : high / 100;
+  const mid = (lo + hi) / 2;
+  return { unit: isBpm ? 'bpm' : 'hr', from: mid, to: mid, low: lo, high: hi };
+}
 
 /** FIT custom power values: 0 to 1000 are % FTP; above 1000 are watts + 1000. */
 function powerRange(low: number, high: number): PowerTarget {
@@ -68,6 +84,21 @@ export function parseFitWorkout(bytes: Uint8Array): Workout {
         step.target = powerRange(low, high);
       }
       if (step.target) { step.kind = 'steady'; step.erg = true; }
+    } else if (targetType === TARGET_SPEED && low !== undefined && high !== undefined && high > 0) {
+      // Speeds are metres per second × 1000. FIT has no "fraction of threshold" form for pace.
+      const lo = low / 1000;
+      const hi = high / 1000;
+      step.target = { unit: 'speed', from: (lo + hi) / 2, to: (lo + hi) / 2, low: lo, high: hi };
+      step.kind = 'steady'; step.erg = true;
+    } else if (targetType === TARGET_HR) {
+      if (targetValue > 0 && targetValue <= HR_ZONES.length) {
+        const [lo, hi] = HR_ZONES[targetValue - 1];
+        step.target = { unit: 'hr', from: (lo + hi) / 2, to: (lo + hi) / 2, low: lo, high: hi };
+      } else if (low !== undefined && high !== undefined) {
+        step.target = hrRange(low, high);
+      }
+      // Heart rate cannot be imposed by a trainer: these steps are ridden or run to feel.
+      if (step.target) step.kind = 'steady';
     } else if (targetType === TARGET_CADENCE && low !== undefined && high !== undefined) {
       step.cadence = (low + high) / 2;
     }
@@ -113,9 +144,15 @@ export function parseFitWorkout(bytes: Uint8Array): Workout {
 /**
  * Write a workout as a FIT workout file for head units and training platforms.
  * Ramps are approximated by their midpoint, as FIT steps have a single range.
+ * Pace targets given as a fraction of threshold are written as absolute speeds,
+ * using `thresholdSpeed` (metres per second).
  */
-export function writeFitWorkout(w: Workout, opts: { timeCreated?: number; band?: number } = {}): Uint8Array {
+export function writeFitWorkout(
+  w: Workout,
+  opts: { timeCreated?: number; band?: number; thresholdSpeed?: number; maxHr?: number } = {},
+): Uint8Array {
   const band = opts.band ?? 0.04;
+  const th = { ftp: 1, thresholdSpeed: opts.thresholdSpeed ?? DEFAULT_THRESHOLD_SPEED, maxHr: opts.maxHr ?? DEFAULT_MAX_HR };
   const wr = new FitWriter();
   wr.define(0, Mesg.fileId, [
     { num: 0, type: BaseType.enum }, { num: 1, type: BaseType.uint16 }, { num: 2, type: BaseType.uint16 },
@@ -135,16 +172,25 @@ export function writeFitWorkout(w: Workout, opts: { timeCreated?: number; band?:
   w.steps.forEach((s, i) => {
     let low: number | undefined;
     let high: number | undefined;
+    let type = TARGET_OPEN;
     if (s.target) {
       const mid = (s.target.from + s.target.to) / 2;
       const lo = s.target.low ?? Math.min(s.target.from, s.target.to, mid * (1 - band));
       const hi = s.target.high ?? Math.max(s.target.from, s.target.to, mid * (1 + band));
-      if (s.target.unit === 'watts') { low = lo + 1000; high = hi + 1000; }
-      else { low = lo * 100; high = hi * 100; }
+      switch (s.target.unit) {
+        case 'watts': type = TARGET_POWER; low = lo + 1000; high = hi + 1000; break;
+        case 'ftp': type = TARGET_POWER; low = lo * 100; high = hi * 100; break;
+        case 'pace': case 'speed':
+          type = TARGET_SPEED;
+          low = toAbsolute(lo, s.target.unit, th) * 1000; high = toAbsolute(hi, s.target.unit, th) * 1000;
+          break;
+        case 'hr': type = TARGET_HR; low = lo * 100; high = hi * 100; break;
+        case 'bpm': type = TARGET_HR; low = lo + 100; high = hi + 100; break;
+      }
     }
     const intensity = Math.max(0, INTENSITY.indexOf(s.intensity ?? 'active'));
     wr.write(2, [
-      i, s.label ?? '', DURATION_TIME, s.duration * 1000, s.target ? TARGET_POWER : TARGET_OPEN,
+      i, s.label ?? '', DURATION_TIME, s.duration * 1000, type,
       0, low, high, intensity, s.texts[0]?.message ?? '',
     ]);
   });

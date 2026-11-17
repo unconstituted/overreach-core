@@ -1,6 +1,6 @@
 import {
-  stepPeakFraction, stepStarts, targetAt, toFtpFraction, toWatts,
-  type TextEvent, type Workout, type WorkoutStep,
+  stepPeakFraction, stepStarts, targetAt, targetKind, toAbsolute, toFraction,
+  type TargetKind, type TextEvent, type Thresholds, type Workout, type WorkoutStep,
 } from './model';
 
 export interface Cue {
@@ -35,15 +35,23 @@ export interface RunnerState {
   stepStart: number;
   timeInStep: number;
   timeLeftInStep: number;
-  /** Undefined during free ride. */
+  /** What the current target is expressed in. Undefined during free ride. */
+  targetKind?: TargetKind;
+  /** The target in absolute terms: watts, metres per second or beats per minute. */
+  targetValue?: number;
+  /** Power target in watts. Undefined during free ride and for pace or heart-rate steps. */
   targetWatts?: number;
-  /** Target as a fraction of FTP. Undefined during free ride. */
+  /** Pace target as a speed in metres per second. */
+  targetSpeed?: number;
+  /** Heart-rate target in beats per minute. */
+  targetHr?: number;
+  /** Target as a fraction of its threshold (FTP, threshold speed or max heart rate). Undefined during free ride. */
   targetFraction?: number;
   /** Acceptable band in watts, when the source defined one. */
   bandWatts?: { low: number; high: number };
   erg: boolean;
   cadence?: number;
-  next?: { step: WorkoutStep; stepIndex: number; startsIn: number; targetWatts?: number };
+  next?: { step: WorkoutStep; stepIndex: number; startsIn: number; targetWatts?: number; targetKind?: TargetKind; targetValue?: number };
   cues: ActiveCue[];
   /** Text events currently on screen. */
   texts: TimedText[];
@@ -70,7 +78,13 @@ export class WorkoutRunner {
   private readonly lead: number;
   private readonly textHold: number;
 
-  constructor(readonly workout: Workout, readonly ftp: number, opts: RunnerOptions = {}) {
+  readonly ftp: number;
+  readonly thresholds: Thresholds;
+
+  /** `athlete` is an FTP in watts, or the full set of thresholds (needed for pace and heart-rate targets). */
+  constructor(readonly workout: Workout, athlete: number | Thresholds, opts: RunnerOptions = {}) {
+    this.thresholds = typeof athlete === 'number' ? { ftp: athlete } : { ...athlete };
+    const ftp = this.ftp = this.thresholds.ftp;
     if (!(ftp > 0)) throw new Error('FTP must be positive');
     this.lead = opts.cueLead ?? 5;
     this.textHold = opts.textHold ?? 8;
@@ -82,7 +96,7 @@ export class WorkoutRunner {
     workout.steps.forEach((s, i) => {
       const at = this.starts[i];
       // A small tolerance so 100% written as 0.999999 after unit conversion still counts.
-      if (stepPeakFraction(s, ftp) >= threshold - 1e-9 && at > 0) {
+      if (stepPeakFraction(s, this.thresholds) >= threshold - 1e-9 && at > 0) {
         this.cues.push({ kind: 'spin-up', stepIndex: i, from: Math.max(0, at - this.lead), at });
       }
       for (const t of s.texts) this.texts.push({ ...t, at: at + t.offset, stepIndex: i });
@@ -110,7 +124,7 @@ export class WorkoutRunner {
     const i = this.stepIndexAt(t);
     const step = this.workout.steps[i];
     const v = targetAt(step, t - this.starts[i]);
-    return v === undefined || !step.target ? undefined : toWatts(v, step.target.unit, this.ftp);
+    return v === undefined || !step.target || targetKind(step.target.unit) !== 'power' ? undefined : toAbsolute(v, step.target.unit, this.thresholds);
   }
 
   stateAt(t: number): RunnerState {
@@ -127,29 +141,35 @@ export class WorkoutRunner {
       erg: step.erg && !finished, cadence: step.cadence, cues: [], texts: [],
     };
     if (raw !== undefined && step.target) {
-      state.targetWatts = toWatts(raw, step.target.unit, this.ftp);
-      state.targetFraction = toFtpFraction(raw, step.target.unit, this.ftp);
-      if (step.target.low !== undefined && step.target.high !== undefined) {
-        state.bandWatts = {
-          low: toWatts(step.target.low, step.target.unit, this.ftp),
-          high: toWatts(step.target.high, step.target.unit, this.ftp),
-        };
+      const unit = step.target.unit;
+      const kind = targetKind(unit);
+      const value = toAbsolute(raw, unit, this.thresholds);
+      state.targetKind = kind;
+      state.targetValue = value;
+      state.targetFraction = toFraction(raw, unit, this.thresholds);
+      if (kind === 'power') state.targetWatts = value;
+      else if (kind === 'pace') state.targetSpeed = value;
+      else state.targetHr = value;
+      if (kind === 'power' && step.target.low !== undefined && step.target.high !== undefined) {
+        state.bandWatts = { low: toAbsolute(step.target.low, unit, this.thresholds), high: toAbsolute(step.target.high, unit, this.thresholds) };
       }
     }
     const nextIndex = stepIndex + 1;
     if (nextIndex < this.workout.steps.length) {
       const next = this.workout.steps[nextIndex];
       const nt = targetAt(next, 0);
+      const nk = next.target ? targetKind(next.target.unit) : undefined;
+      const nv = nt !== undefined && next.target ? toAbsolute(nt, next.target.unit, this.thresholds) : undefined;
       state.next = {
         step: next, stepIndex: nextIndex, startsIn: Math.max(0, this.starts[nextIndex] - elapsed),
-        targetWatts: nt !== undefined && next.target ? toWatts(nt, next.target.unit, this.ftp) : undefined,
+        targetWatts: nk === 'power' ? nv : undefined, targetKind: nk, targetValue: nv,
       };
     }
     if (!finished) {
       for (const c of this.cues) {
         if (elapsed >= c.from && elapsed < c.at) {
           const inSeconds = Math.max(1, Math.ceil(c.at - elapsed));
-          state.cues.push({ ...c, inSeconds, message: `Spin up in ${inSeconds}` });
+          state.cues.push({ ...c, inSeconds, message: `${this.workout.sport === 'run' ? 'Pick it up' : 'Spin up'} in ${inSeconds}` });
         }
       }
       for (const x of this.texts) {

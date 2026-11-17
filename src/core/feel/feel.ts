@@ -41,12 +41,20 @@ export const FEEL_PRESETS: Record<FeelPresetName, FeelConfig> = {
 };
 
 export interface FeelInput {
-  /** Watts. */
+  /**
+   * Watts. For a runner, pass the FTP-equivalent effort in watts
+   * (`runEffort(...) * ftp`): the maths is the same for both sports.
+   */
   power: number;
   /** rpm. */
   cadence: number;
-  /** Current workout target in watts, if any. Speed is judged against it. */
+  /** Current workout target in watts (FTP-equivalent for a runner), if any. Speed is judged against it. */
   targetWatts?: number;
+  /**
+   * Strikes per minute. Defaults to two per crank revolution (`cadence × 2`).
+   * A runner passes steps per minute: each footfall is a strike.
+   */
+  strikeRate?: number;
 }
 
 export interface StrokeEvent {
@@ -165,15 +173,16 @@ export class FeelEngine {
     s.ridePeakLabel = Math.max(0, s.ridePeakLabel - dt);
     s.sinceBreak += dt;
 
-    // Each crank revolution is two strokes.
-    this.phase += (Math.max(0, input.cadence) / 60) * 2 * dt;
+    // Each crank revolution is two strokes; each running step is one.
+    const rate = input.strikeRate ?? Math.max(0, input.cadence) * 2;
+    this.phase += (Math.max(0, rate) / 60) * dt;
     let guard = 0;
     while (this.phase >= 1 && guard++ < 8) {
       this.phase -= 1;
       this.stroke(Math.max(0, input.power), events);
     }
     if (this.phase >= 1) this.phase = 0;
-    if (input.cadence < 1) this.phase = 0;
+    if (rate < 2) this.phase = 0;
 
     // Speed: a spring towards the effort-based target. Critically damped at
     // low effort; stiffer and underdamped above VO2, so it kicks and overshoots.

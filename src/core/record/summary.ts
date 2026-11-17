@@ -1,3 +1,4 @@
+import { paceToEffort } from '../workout/effort';
 import type { RideSample } from './recorder';
 
 /** Coggan power zones as upper bounds (fraction of FTP). Zone 7 is open-ended. */
@@ -40,11 +41,27 @@ export function normalisedPower(power: number[]): number {
   return Math.pow(acc / count, 0.25);
 }
 
+export interface SummaryOptions {
+  sport?: 'bike' | 'run';
+  /** Runner's threshold speed, m/s: scores a run that has no power data. */
+  thresholdSpeed?: number;
+  /** Body mass, kg, for a run's calories when there is no power. */
+  mass?: number;
+}
+
 export interface RideSummary {
+  sport: 'bike' | 'run';
   /** Seconds. */
   duration: number;
-  /** Metres, from the realistic bike model. */
+  /** Metres: from the bike model, a map's terrain, or the treadmill or footpod. */
   distance: number;
+  /** True when any sample had power (a run without a power-reporting footpod has none). */
+  hasPower: boolean;
+  /**
+   * For runs: normalised speed (the speed counterpart of normalised power), m/s.
+   * Intensity and training stress for a run without power come from this.
+   */
+  normalisedSpeed?: number;
   avgPower: number;
   maxPower: number;
   normalisedPower: number;
@@ -66,7 +83,8 @@ export interface RideSummary {
   timeInHrZones: number[];
 }
 
-export function summarise(samples: RideSample[], ftp: number, maxHr?: number): RideSummary {
+export function summarise(samples: RideSample[], ftp: number, maxHr?: number, opts: SummaryOptions = {}): RideSummary {
+  const sport = opts.sport ?? 'bike';
   const n = samples.length;
   const power = samples.map((s) => s.power);
   let sumP = 0, maxP = 0, sumHr = 0, nHr = 0, maxH = 0, sumCad = 0, nCad = 0, maxCad = 0, maxSpeed = 0;
@@ -91,13 +109,24 @@ export function summarise(samples: RideSample[], ftp: number, maxHr?: number): R
   const avgPower = n ? sumP / n : 0;
   const np = normalisedPower(power);
   const kj = sumP / 1000; // one sample per second, so the sum of watts is joules
-  const intensity = ftp > 0 ? np / ftp : 0;
   const distance = n ? samples[n - 1].distance : 0;
+  const hasPower = maxP > 0;
+  let intensity = ftp > 0 ? np / ftp : 0;
+  let calories = kj / 4.184 / 0.24;
+  let normalisedSpeed: number | undefined;
+  if (sport === 'run') {
+    // The same rolling fourth-power average, on speed. Effort, not speed, is what is scored,
+    // so the result goes through the running effort curve (threshold pace = intensity 1).
+    normalisedSpeed = normalisedPower(samples.map((s) => s.bikeSpeed));
+    if (!hasPower && opts.thresholdSpeed) intensity = paceToEffort(normalisedSpeed / opts.thresholdSpeed);
+    // Running costs about 1 kcal per kilogram per kilometre, whatever the pace.
+    if (!hasPower) calories = (distance / 1000) * (opts.mass ?? 70);
+  }
   return {
-    duration: n, distance, avgPower, maxPower: maxP, normalisedPower: np, kilojoules: kj,
-    calories: kj / 4.184 / 0.24,
+    sport, duration: n, distance, hasPower, normalisedSpeed, avgPower, maxPower: maxP, normalisedPower: np, kilojoules: kj,
+    calories,
     intensityFactor: intensity,
-    trainingStress: ftp > 0 ? (n * np * intensity) / (ftp * 3600) * 100 : 0,
+    trainingStress: (n / 3600) * intensity * intensity * 100,
     avgHeartRate: nHr ? sumHr / nHr : undefined,
     maxHeartRate: nHr ? maxH : undefined,
     avgCadence: nCad ? sumCad / nCad : undefined,

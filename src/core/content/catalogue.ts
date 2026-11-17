@@ -1,5 +1,7 @@
 import { loadChapterWorkout, type Chapter } from '../chapter';
-import { buildWorkout, parseFitWorkout, parseZwo, targetAt, totalDuration, type Workout } from '../workout';
+import {
+  buildWorkout, DEFAULT_MAX_HR, DEFAULT_THRESHOLD_SPEED, hrToEffort, paceToEffort, parseFitWorkout, parseZwo, targetAt, totalDuration, type Workout,
+} from '../workout';
 import {
   parseRef, type Catalogue, type CatalogueEntry, type GraphBar, type MapDoc, type PlanDoc, type SeasonDoc, type UnlockRule, type WorkoutDoc,
 } from './types';
@@ -40,8 +42,9 @@ export interface WorkoutStats {
 const FREE_EFFORT = 0.6;
 
 /**
- * Planned load of a workout. Targets in absolute units (watts, m/s, bpm) are
- * scaled by `reference` (a nominal threshold in the same unit) when given.
+ * Planned load of a workout, as FTP-equivalent effort. Absolute watts are
+ * scaled by `reference`; absolute speeds and heart rates by the default
+ * threshold pace and maximum heart rate.
  */
 export function workoutStats(w: Workout, reference = 250): WorkoutStats {
   let sum4 = 0;
@@ -49,11 +52,17 @@ export function workoutStats(w: Workout, reference = 250): WorkoutStats {
   let above = 0;
   const graph: GraphBar[] = [];
   for (const s of w.steps) {
+    // Everything is scored as FTP-equivalent effort, so a run and a ride of the same effort look the same.
     const rel = (v: number): number => {
-      const unit = s.target?.unit as string | undefined;
-      if (unit === 'watts') return v / reference;
-      // Fractions of threshold (power or pace) and of max heart rate are used as they are.
-      return unit === 'ftp' || unit === 'pace' || unit === 'hr' ? v : FREE_EFFORT;
+      switch (s.target?.unit) {
+        case 'ftp': return v;
+        case 'watts': return v / reference;
+        case 'pace': return paceToEffort(v);
+        case 'speed': return paceToEffort(v / DEFAULT_THRESHOLD_SPEED);
+        case 'hr': return hrToEffort(v);
+        case 'bpm': return hrToEffort(v / DEFAULT_MAX_HR);
+        default: return FREE_EFFORT;
+      }
     };
     const from = s.target ? rel(s.target.from) : 0;
     const to = s.target ? rel(s.target.to) : 0;
