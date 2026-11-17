@@ -170,6 +170,7 @@ export type ControlPointCommand =
   | { op: 'requestControl' } | { op: 'reset' } | { op: 'start' } | { op: 'stop'; pause: boolean }
   | { op: 'setTargetPower'; watts: number } | { op: 'setTargetResistance'; level: number }
   | { op: 'setSimulation'; windSpeed: number; grade: number; crr: number; cw: number }
+  | { op: 'setTargetSpeed'; kmh: number } | { op: 'setTargetInclination'; percent: number }
   | { op: 'unknown'; code: number };
 
 /** Parse a control point write, as a trainer would. Used by the simulated trainer and by tests. */
@@ -187,6 +188,12 @@ export function parseControlPointCommand(input: Uint8Array | DataView): ControlP
     case FtmsOp.setTargetResistance:
       if (v.byteLength < 2) break;
       return { op: 'setTargetResistance', level: v.getUint8(1) / 10 };
+    case 0x02: // set target speed (treadmills)
+      if (v.byteLength < 3) break;
+      return { op: 'setTargetSpeed', kmh: v.getUint16(1, true) / 100 };
+    case 0x03: // set target inclination (treadmills)
+      if (v.byteLength < 3) break;
+      return { op: 'setTargetInclination', percent: v.getInt16(1, true) / 10 };
     case FtmsOp.setIndoorBikeSimulation:
       if (v.byteLength < 7) break;
       return {
@@ -221,6 +228,7 @@ export function encodeControlPointResponse(requestOp: number, result: number): U
 export type MachineStatus =
   | { kind: 'reset' } | { kind: 'stopped' } | { kind: 'paused' } | { kind: 'stoppedBySafetyKey' } | { kind: 'started' }
   | { kind: 'targetPowerChanged'; watts: number } | { kind: 'targetResistanceChanged'; level: number }
+  | { kind: 'targetSpeedChanged'; kmh: number } | { kind: 'targetInclinationChanged'; percent: number }
   | { kind: 'simulationChanged'; windSpeed: number; grade: number; crr: number; cw: number }
   | { kind: 'controlPermissionLost' } | { kind: 'other'; code: number };
 
@@ -232,6 +240,8 @@ export function parseMachineStatus(input: Uint8Array | DataView): MachineStatus 
     case 0x02: return v.byteLength > 1 && v.getUint8(1) === 0x02 ? { kind: 'paused' } : { kind: 'stopped' };
     case 0x03: return { kind: 'stoppedBySafetyKey' };
     case 0x04: return { kind: 'started' };
+    case 0x05: if (v.byteLength >= 3) return { kind: 'targetSpeedChanged', kmh: v.getUint16(1, true) / 100 }; break;
+    case 0x06: if (v.byteLength >= 3) return { kind: 'targetInclinationChanged', percent: v.getInt16(1, true) / 10 }; break;
     case 0x07: if (v.byteLength >= 2) return { kind: 'targetResistanceChanged', level: v.getUint8(1) / 10 }; break;
     case 0x08: if (v.byteLength >= 3) return { kind: 'targetPowerChanged', watts: v.getInt16(1, true) }; break;
     case 0x12:
@@ -264,6 +274,9 @@ export function parseSupportedPowerRange(input: Uint8Array | DataView): PowerRan
 /* ---------- Fitness Machine Feature (0x2ACC) ---------- */
 
 export interface MachineFeatures {
+  inclination: boolean;
+  speedTarget: boolean;
+  inclinationTarget: boolean;
   cadence: boolean;
   powerMeasurement: boolean;
   powerTarget: boolean;
@@ -277,6 +290,9 @@ export function parseMachineFeatures(input: Uint8Array | DataView): MachineFeatu
   const features = v.getUint32(0, true);
   const targets = v.getUint32(4, true);
   return {
+    inclination: (features & (1 << 3)) !== 0,
+    speedTarget: (targets & (1 << 0)) !== 0,
+    inclinationTarget: (targets & (1 << 1)) !== 0,
     cadence: (features & (1 << 1)) !== 0,
     powerMeasurement: (features & (1 << 14)) !== 0,
     resistanceTarget: (targets & (1 << 2)) !== 0,

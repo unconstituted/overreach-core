@@ -78,3 +78,42 @@ export class Emitter<T> {
     return this.listeners.size;
   }
 }
+
+/* ---------- Running ---------- */
+
+export interface RunData {
+  /** Belt or footpod speed, m/s. */
+  speed?: number;
+  /** Steps per minute. */
+  cadence?: number;
+  /** Treadmill incline, percent. */
+  incline?: number;
+  /** Device's own distance counter, metres. */
+  distance?: number;
+  /** Running power, watts, from a footpod or treadmill that reports it. */
+  power?: number;
+}
+
+/** A treadmill (smart or not) or a footpod. */
+export interface RunSource extends Device {
+  onRun(cb: (data: RunData) => void): Unsubscribe;
+}
+
+export interface ControllableTreadmill extends RunSource {
+  /** False when the treadmill reports data but refuses control (or has no control point). */
+  readonly controllable: boolean;
+  /**
+   * True after the runner has stopped the belt themselves (the stop button or
+   * the safety key). The engine sends no more speeds until `resume()`.
+   */
+  readonly stoppedByRunner: boolean;
+  /** Belt speed target, m/s. Starts the belt if it is idle, unless the runner stopped it. */
+  setTargetSpeed(speed: number): Promise<void>;
+  setTargetIncline(percent: number): Promise<void>;
+  /** Stop (or pause) the belt. */
+  stop(pause?: boolean): Promise<void>;
+  /** The runner asked to carry on: clear `stoppedByRunner`. Does not start the belt by itself. */
+  resume(): void;
+  /** Stop the belt and give control back. */
+  release(): Promise<void>;
+}

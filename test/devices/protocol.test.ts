@@ -117,6 +117,7 @@ describe('FTMS status, power range and features', () => {
     // targets: resistance (bit 2) + power (bit 3) + simulation (bit 13) = 0x0000200C
     expect(parseMachineFeatures(hex('02 40 00 00 0C 20 00 00'))).toEqual({
       cadence: true, powerMeasurement: true, resistanceTarget: true, powerTarget: true, simulation: true,
+      inclination: false, speedTarget: false, inclinationTarget: false,
     });
     expect(parseMachineFeatures(hex('00 00 00 00 00 00 00 00'))).toMatchObject({ powerTarget: false, simulation: false });
   });

@@ -10,9 +10,15 @@ import {
   parseSupportedPowerRange, type PowerRange,
 } from './protocol/ftms';
 import { HRS_MEASUREMENT, HRS_SERVICE, parseHeartRateMeasurement } from './protocol/hrs';
+import { parseRscMeasurement, RSC_MEASUREMENT, RSC_SERVICE } from './protocol/rsc';
+import {
+  FTMS_SUPPORTED_INCLINATION_RANGE, FTMS_SUPPORTED_SPEED_RANGE, FTMS_TREADMILL_DATA, parseSupportedInclinationRange,
+  parseSupportedSpeedRange, type Range,
+} from './protocol/treadmill';
+import { FtmsTreadmill, type TreadmillTransport } from './ftmsTreadmill';
 import {
   Emitter, type ConnectionState, type DeviceInfo, type HeartRateData, type HeartRateSource,
-  type PowerData, type PowerSource, type Unsubscribe,
+  type PowerData, type PowerSource, type RunData, type RunSource, type Unsubscribe,
 } from './types';
 
 /* Minimal structural types for the parts of Web Bluetooth we use, so no extra typings package is needed. */
@@ -307,4 +313,122 @@ export async function connectHeartRate(bt: Bt = getBluetooth(), opts: ReconnectO
   hr.link = new BleLink(device, (srv) => hr.setup(srv), opts);
   await hr.link.connect();
   return hr;
+}
+
+/* ---------- Running: treadmills and footpods ---------- */
+
+async function treadmillTransport(server: BtServer): Promise<TreadmillTransport> {
+  const service = await server.getPrimaryService(FTMS_SERVICE);
+  const data = new Emitter<Uint8Array>();
+  const cp = new Emitter<Uint8Array>();
+  const status = new Emitter<Uint8Array>();
+  await subscribe(await service.getCharacteristic(FTMS_TREADMILL_DATA), (b) => data.emit(b));
+  let control: BtCharacteristic | undefined;
+  try {
+    control = await service.getCharacteristic(FTMS_CONTROL_POINT);
+    await subscribe(control, (b) => cp.emit(b));
+  } catch { control = undefined; /* a treadmill that only reports */ }
+  try {
+    await subscribe(await service.getCharacteristic(FTMS_STATUS), (b) => status.emit(b));
+  } catch { /* optional */ }
+  let speedRange: Range | undefined;
+  let inclineRange: Range | undefined;
+  try { speedRange = parseSupportedSpeedRange(await (await service.getCharacteristic(FTMS_SUPPORTED_SPEED_RANGE)).readValue()); } catch { /* optional */ }
+  try { inclineRange = parseSupportedInclinationRange(await (await service.getCharacteristic(FTMS_SUPPORTED_INCLINATION_RANGE)).readValue()); } catch { /* optional */ }
+  const t: TreadmillTransport = {
+    speedRange, inclineRange,
+    onTreadmillData: (cb) => data.on(cb),
+    onControlPoint: (cb) => cp.on(cb),
+    onStatus: (cb) => status.on(cb),
+  };
+  if (control) {
+    const ch = control;
+    t.writeControlPoint = async (bytes) => {
+      if (ch.writeValueWithResponse) await ch.writeValueWithResponse(bytes);
+      else if (ch.writeValue) await ch.writeValue(bytes);
+      else throw new Error('The control point cannot be written');
+    };
+  }
+  return t;
+}
+
+/** A treadmill over FTMS, with reconnect that restores control and targets (but never restarts a stopped belt). */
+export class BleTreadmill extends FtmsTreadmill {
+  link!: BleLink;
+  override async disconnect(): Promise<void> {
+    await this.link.close();
+    await super.disconnect();
+  }
+}
+
+/**
+ * Show the device picker for treadmills and connect over FTMS. Must be
+ * called from a user gesture. A treadmill without a control point connects
+ * as read-only (`controllable` is false): the runner sets the speed by hand.
+ */
+export async function connectTreadmill(bt: Bt = getBluetooth(), opts: ReconnectOptions = {}): Promise<BleTreadmill> {
+  const device = await bt.requestDevice({ filters: [{ services: [FTMS_SERVICE] }] });
+  const name = device.name || 'Bluetooth treadmill';
+  let treadmill: BleTreadmill | undefined;
+  let probed = false;
+  const link = new BleLink(device, async (srv) => {
+    const transport = await treadmillTransport(srv);
+    if (!treadmill) {
+      treadmill = new BleTreadmill({ name, kind: 'bluetooth', protocol: transport.writeControlPoint ? 'FTMS treadmill (controllable)' : 'FTMS treadmill (read-only)' }, transport);
+    } else await treadmill.reattach(transport);
+    probed = true;
+  }, opts);
+  await link.connect();
+  if (!probed || !treadmill) throw new Error('This device does not report treadmill data');
+  const t = treadmill as BleTreadmill;
+  t.link = link;
+  t.setState(link.state);
+  link.states.on((s) => t.setState(s));
+  return t;
+}
+
+/**
+ * A footpod over the Running Speed and Cadence Service, with running power
+ * from the Cycling Power Service when the pod offers it (as Stryd does).
+ */
+export class BleFootpod implements RunSource {
+  readonly info: DeviceInfo;
+  private readonly run = new Emitter<RunData>();
+  link!: BleLink;
+  /** True once the pod has offered running power. */
+  hasPower = false;
+
+  constructor(name: string) {
+    this.info = { name, kind: 'bluetooth', protocol: 'Running Speed and Cadence' };
+  }
+
+  async setup(server: BtServer): Promise<void> {
+    const service = await server.getPrimaryService(RSC_SERVICE);
+    await subscribe(await service.getCharacteristic(RSC_MEASUREMENT), (b) => {
+      const m = parseRscMeasurement(b);
+      this.run.emit({ speed: m.speed, cadence: m.cadence, distance: m.totalDistance });
+    });
+    try {
+      const cps = await server.getPrimaryService(CPS_SERVICE);
+      await subscribe(await cps.getCharacteristic(CPS_MEASUREMENT), (b) => {
+        this.run.emit({ power: Math.max(0, parseCyclingPowerMeasurement(b).power) });
+      });
+      this.hasPower = true;
+      (this.info as { protocol: string }).protocol = 'Running Speed and Cadence, with running power';
+    } catch { /* most footpods have no power */ }
+  }
+
+  get state(): ConnectionState { return this.link.state; }
+  onRun(cb: (d: RunData) => void): Unsubscribe { return this.run.on(cb); }
+  onState(cb: (s: ConnectionState) => void): Unsubscribe { return this.link.states.on(cb); }
+  disconnect(): Promise<void> { return this.link.close(); }
+}
+
+/** Show the device picker for footpods and connect. Call from a user gesture. */
+export async function connectFootpod(bt: Bt = getBluetooth(), opts: ReconnectOptions = {}): Promise<BleFootpod> {
+  const device = await bt.requestDevice({ filters: [{ services: [RSC_SERVICE] }], optionalServices: [CPS_SERVICE] });
+  const pod = new BleFootpod(device.name || 'Footpod');
+  pod.link = new BleLink(device, (srv) => pod.setup(srv), opts);
+  await pod.link.connect();
+  return pod;
 }
