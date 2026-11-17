@@ -13,6 +13,8 @@ export interface RuntimeOptions {
   clipDurations?: Record<string, number>;
   /** A time jump larger than this (or any backwards step) is treated as a seek. Seconds. */
   maxStep?: number;
+  /** Story flags carried in from earlier chapters of the season. */
+  initialFlags?: Record<string, boolean>;
 }
 
 export interface ActiveDialogue {
@@ -158,6 +160,7 @@ export class ChapterRuntime {
   private readonly clipDurations: Record<string, number>;
   private last: number | undefined;
   private flags: Record<string, boolean> = {};
+  private readonly initialFlags: Record<string, boolean>;
   private readonly records = new Map<string, ChallengeRecord>();
   private dialogue: Injected<DialogueCue>[];
   private glass: Injected<GlassLine>[];
@@ -167,6 +170,8 @@ export class ChapterRuntime {
   private readonly ambienceNames: string[];
 
   constructor(readonly chapter: Chapter, private readonly opts: RuntimeOptions) {
+    this.initialFlags = { ...(opts.initialFlags ?? {}) };
+    this.flags = { ...this.initialFlags };
     this.workout = opts.workout ?? loadChapterWorkout(chapter);
     this.runner = new WorkoutRunner(this.workout, opts.ftp);
     this.duration = chapter.duration;
@@ -398,7 +403,7 @@ export class ChapterRuntime {
   /** Recompute flags and injected items from the challenge results that still stand. */
   private rebuild(): void {
     const ch = this.chapter;
-    this.flags = {};
+    this.flags = { ...this.initialFlags };
     this.dialogue = [...(ch.dialogue ?? [])];
     this.glass = [...(ch.glass ?? [])];
     this.hud = [...(ch.hud ?? [])];
