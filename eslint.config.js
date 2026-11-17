@@ -12,7 +12,8 @@ export default tseslint.config(
   },
   {
     files: ['tools/**/*.mjs', 'tools/**/*.ts'],
-    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+    // window and document appear inside page.evaluate callbacks, which run in the browser.
+    languageOptions: { globals: { process: 'readonly', console: 'readonly', window: 'readonly', document: 'readonly' } },
   },
   {
     // The core must stay portable: no DOM, no Three.js, no browser APIs.

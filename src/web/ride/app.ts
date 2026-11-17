@@ -9,18 +9,49 @@
  * and the ship visibly sags, but the chapter does not wait.
  */
 import { checkChapter, ChapterRuntime, loadChapterWorkout, type Chapter, type ChapterEvent, type ChapterState } from '../../core/chapter';
+import { FreeRide, type MapDoc } from '../../core/content';
 import { FEEL_PRESETS, FeelEngine, type FeelEvent, type FeelPresetName } from '../../core/feel';
 import { encodeFitActivity, POWER_ZONE_NAMES, RideRecorder, summarise, type RideSummary } from '../../core/record';
+import { defaultValues, rideConfig, setValue, type RideConfig } from '../../core/settings';
 import { clamp } from '../../core/util/math';
 import { ENGINE_NAME, ENGINE_VERSION } from '../../core/version';
+import type { Workout } from '../../core/workout';
 import { DeviceManager } from '../../devices';
 import { mountDevicePanel } from '../devicePanel';
 import { RideAudio } from './audio';
 import { fmtClock, Stage, zoneColour } from './stage';
 import { World } from './world';
 
+/** What a finished ride hands back to whoever launched it. */
+export interface RideResult {
+  /** Rode to the end (of the chapter, workout or map). */
+  complete: boolean;
+  /** Unix seconds. */
+  startTime: number;
+  summary?: RideSummary;
+  fit?: Uint8Array;
+  /** Story flags at the end of a chapter. */
+  flags: Record<string, boolean>;
+  simulated: boolean;
+}
+
+/** A ride launched from the menus: everything is handed in, and the result is handed back. */
+export interface RideSession {
+  chapter: Chapter;
+  /** Parsed workout, when the chapter refers to a workout file. */
+  workout?: Workout;
+  /** Folder the chapter's clips and images are relative to. */
+  assetBase: string;
+  config: RideConfig;
+  devices: DeviceManager;
+  initialFlags?: Record<string, boolean>;
+  /** Present for a free ride: the map to ride. */
+  map?: MapDoc;
+  onFinish(result: RideResult): void;
+}
+
 export interface RideOptions {
-  /** Chapter id: loads `<id>.chapter.json` from the chapters folder. */
+  /** Chapter id: loads `<id>.chapter.json` from the chapters folder. Ignored when `session` is given. */
   chapter: string;
   /** Start time in seconds (for testing a scene). */
   startAt?: number;
@@ -31,6 +62,7 @@ export interface RideOptions {
   mute?: boolean;
   /** Skip the 3D view (for tests on machines without WebGL). */
   noWorld?: boolean;
+  session?: RideSession;
 }
 
 interface Settings { ftp: number; maxHr: number; feel: FeelPresetName; hudPos: 'top' | 'bot' }
@@ -51,14 +83,22 @@ function loadSettings(): Settings {
 function saveSettings(s: Settings): void {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
+function configFrom(s: Settings): RideConfig {
+  let v = setValue(defaultValues('settings'), 'feel.preset', s.feel);
+  v = setValue(v, 'hud.position', s.hudPos);
+  return rideConfig({ ftp: s.ftp, maxHr: s.maxHr }, v);
+}
 
 const FEEL_LABEL: Record<FeelPresetName, string> = { off: 'Off', restrained: 'Restrained', standard: 'Standard', aggressive: 'Aggressive' };
 const FEEL_ORDER: FeelPresetName[] = ['off', 'restrained', 'standard', 'aggressive'];
 
 export class RideApp {
   readonly devices: DeviceManager;
+  /** Start-screen settings, used only when the ride is opened directly (not from the menus). */
   settings: Settings;
+  cfg: RideConfig;
   chapter!: Chapter;
+  freeRide?: FreeRide;
   rt!: ChapterRuntime;
   feel!: FeelEngine;
   recorder!: RideRecorder;
@@ -85,12 +125,23 @@ export class RideApp {
   private effortScale = 1;
   private pedalling = true;
   private lastFit?: Uint8Array;
+  private complete = false;
   private summary?: RideSummary;
   private chapterBase = '.';
+  private readonly session?: RideSession;
+  private startTime = 0;
+  private disposed = false;
+  private readonly onVisible = (): void => { this.lastNow = performance.now(); };
 
   constructor(private readonly root: HTMLElement, private readonly opts: RideOptions) {
     this.settings = loadSettings();
-    this.devices = new DeviceManager({ ftp: this.settings.ftp });
+    this.session = opts.session;
+    if (!this.session) this.feelName = this.settings.feel;
+    this.cfg = this.session?.config ?? configFrom(this.settings);
+    this.devices = this.session?.devices ?? new DeviceManager({ ftp: this.cfg.ftp });
+    if (this.session) this.chapterBase = this.session.assetBase;
+    this.showInserts = this.cfg.storyboard;
+    this.cameraOverride = this.cfg.camera === 'auto' ? null : this.cfg.camera;
     this.rate = Math.max(0.1, opts.rate ?? 1);
   }
 
@@ -99,6 +150,12 @@ export class RideApp {
   /* ------------------------------------------------------------------ */
 
   async init(): Promise<void> {
+    if (this.session) {
+      this.chapter = this.session.chapter;
+      if (!this.devices.power) await this.devices.useSimTrainer();
+      await this.start();
+      return;
+    }
     const res = await fetch(`${this.chapterBase}/${this.opts.chapter}.chapter.json`);
     if (!res.ok) throw new Error(`Chapter "${this.opts.chapter}" not found (HTTP ${res.status})`);
     this.chapter = (await res.json()) as Chapter;
@@ -111,15 +168,15 @@ export class RideApp {
 
   private async buildRuntime(): Promise<void> {
     const ch = this.chapter;
-    let workout;
-    if ('file' in ch.workout) {
+    let workout = this.session?.workout;
+    if (!workout && 'file' in ch.workout) {
       const path = ch.workout.file;
       const res = await fetch(`${this.chapterBase}/${path}`);
       if (!res.ok) throw new Error(`Workout file ${path} not found`);
       const data = /\.zwo$/i.test(path) ? await res.text() : new Uint8Array(await res.arrayBuffer());
       workout = loadChapterWorkout(ch, () => data);
     }
-    this.rt = new ChapterRuntime(ch, { ftp: this.settings.ftp, maxHr: this.settings.maxHr, workout });
+    this.rt = new ChapterRuntime(ch, { ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, workout, initialFlags: this.session?.initialFlags });
   }
 
   /* ------------------------------------------------------------------ */
@@ -161,6 +218,7 @@ export class RideApp {
       s.feel = (el.querySelector('#s-feel') as HTMLSelectElement).value as FeelPresetName;
       s.hudPos = (el.querySelector('#s-pos') as HTMLSelectElement).value as 'top' | 'bot';
       saveSettings(s);
+      this.cfg = configFrom(s);
       try {
         await this.start((p) => { go.textContent = `Loading sound ${Math.round(p * 100)}%`; });
         unmount();
@@ -187,15 +245,17 @@ export class RideApp {
   /* ------------------------------------------------------------------ */
 
   async start(progress?: (fraction: number) => void): Promise<void> {
-    const s = this.settings;
+    const cfg = this.cfg;
     await this.buildRuntime();
     // The simulated rider needs to know the FTP the workout is scaled to.
     if (this.devices.power?.info.kind === 'sim') {
-      this.devices.setSimOptions({ ftp: s.ftp, maxHr: s.maxHr });
+      this.devices.setSimOptions({ ftp: cfg.ftp, maxHr: cfg.maxHr });
       await this.devices.useSimTrainer();
     }
-    this.feel = new FeelEngine({ ...FEEL_PRESETS[s.feel] }, s.ftp);
-    this.recorder = new RideRecorder(Date.now() / 1000);
+    this.feel = new FeelEngine({ ...cfg.feel }, cfg.ftp);
+    this.startTime = Date.now() / 1000;
+    this.recorder = new RideRecorder(this.startTime);
+    this.freeRide = this.session?.map ? new FreeRide(this.session.map, cfg.weight) : undefined;
     this.rideClock = 0; this.finished = false; this.lastFit = undefined; this.summary = undefined;
     this.T = clamp(this.opts.startAt ?? 0, 0, this.rt.duration - 1);
 
@@ -203,7 +263,6 @@ export class RideApp {
     this.stage?.dispose(); this.world?.dispose();
     const assets = this.chapter.assets ?? {};
     this.stage = new Stage(this.root, this.rt, `${this.chapterBase}/${assets.images ?? '.'}`, (t) => this.seek(t));
-    this.stage.setHudPosition(s.hudPos);
     this.buildControls();
     if (!this.opts.noWorld) {
       try {
@@ -222,6 +281,7 @@ export class RideApp {
       }
     }
     if (this.audio) this.audio.muted = !!this.opts.mute;
+    this.applyConfig(cfg);
     this.started = true;
     this.state = this.rt.seek(this.T);
     await this.setPlaying(true);
@@ -231,8 +291,18 @@ export class RideApp {
       this.lastNow = performance.now();
       this.raf = requestAnimationFrame(this.frame);
       // Browsers stop drawing a hidden tab. Treat that as a pause rather than leaping ahead on return.
-      document.addEventListener('visibilitychange', () => { this.lastNow = performance.now(); });
+      document.addEventListener('visibilitychange', this.onVisible);
     }
+  }
+
+  /** Apply (or re-apply, mid-ride) the player's settings. */
+  applyConfig(cfg: RideConfig): void {
+    this.cfg = cfg;
+    if (this.feel) this.feel.config = { ...cfg.feel };
+    this.stage?.setHudPosition(cfg.hudPosition);
+    this.stage?.setSubtitleSize(cfg.subtitleSize);
+    this.stage?.setWorkoutStrip(cfg.workoutStrip);
+    if (this.audio) this.audio.volume = { ...cfg.volume };
   }
 
   async setPlaying(p: boolean): Promise<void> {
@@ -280,9 +350,12 @@ export class RideApp {
         this.T = Math.min(rt.duration, this.T + h);
         this.rideClock += h;
         const wk = rt.runner.stateAt(this.T);
+        const fr0 = this.freeRide;
         this.applyRiderControls(wk.targetWatts);
-        this.devices.applyTarget(wk.targetWatts, wk.erg, wk.cadence);
+        if (fr0) this.devices.applyGrade(fr0.trainerGrade(this.cfg.gradeScale));
+        else this.devices.applyTarget(wk.targetWatts, wk.erg, wk.cadence);
         this.devices.tick(h);
+        fr0?.update(h, live.power);
         feelEvents.push(...this.feel.update(h, { power: live.power, cadence: live.cadence, targetWatts: wk.targetWatts }));
         const fr = rt.advance(this.T, { power: live.power, cadence: live.cadence, heartRate: live.heartRate || undefined });
         this.state = fr.state;
@@ -290,9 +363,11 @@ export class RideApp {
         for (const e of fr.events) if (e.type === 'step') this.recorder.lap(this.rideClock, rt.workout.steps[e.stepIndex].label);
         this.recorder.update(this.rideClock, {
           power: live.power, cadence: live.cadence, heartRate: live.heartRate || undefined,
-          gameSpeed: fr.state.scene.speed * this.feel.state.speedFactor,
+          gameSpeed: fr0 ? fr0.speed * fr0.sceneScale : fr.state.scene.speed * this.feel.state.speedFactor,
+          roadSpeed: fr0?.speed,
         });
-        if (this.T >= rt.duration) this.finish();
+        if (fr0?.finished) { this.complete = true; this.finish(); }
+        if (!this.finished && this.T >= rt.duration) { this.complete = !fr0; this.finish(); }
       }
     } else if (!this.finished) {
       // Paused: keep the picture and the devices alive, but not the story or the recording.
@@ -300,6 +375,7 @@ export class RideApp {
       const fr = rt.advance(this.T);
       this.state = fr.state; seeked = fr.seeked;
     }
+    if (this.disposed || !this.stage) return;
     const state = this.state ?? rt.stateAt(this.T);
 
     // Step announcements on the visor.
@@ -317,20 +393,37 @@ export class RideApp {
     if (this.flash && now > this.flash.until) this.flash = undefined;
 
     const fs = this.feel.state; const cfg = this.feel.config;
-    const speed = state.scene.speed * fs.speedFactor;
+    const free = this.freeRide;
+    const sc = state.scene;
+    let speed = sc.speed * fs.speedFactor;
+    let speedFactor = fs.speedFactor;
+    let nav: string | undefined;
+    if (free) {
+      // On a free ride the rider is the only thing moving the ship.
+      sc.speed = free.speed * free.sceneScale;
+      sc.distance = free.distance * free.sceneScale;
+      sc.curves.fov = free.fov();
+      speed = sc.speed;
+      speedFactor = clamp(free.speed / 9, 0.1, 1.3);
+      const g = free.grade;
+      const km = this.cfg.units === 'imperial' ? `${(free.remaining / 1609.344).toFixed(1)} MI` : `${(free.remaining / 1000).toFixed(1)} KM`;
+      nav = `${g >= 0 ? '+' : '−'}${Math.abs(g).toFixed(1)}% · ${km} TO GO`;
+    }
+    if (this.cfg.reducedMotion) { sc.curves.shake = 0; sc.impactShake = 0; sc.curves.roll = 0; }
+    if (this.cfg.reduceFlashes) { sc.curves.flash = 0; sc.curves.glitch = 0; sc.impactFlash = 0; }
     const realtime = this.rate === 1;
     // Hit-stop: hold the picture for a few frames when the rider breaks their peak. The story clock is not held.
     const frozen = realtime && cfg.enabled && fs.freeze > 0 && this.playing;
     if (this.world && !frozen) {
       this.world.frame({
-        t: state.t, dt: dtStory, scene: state.scene, cameraOverride: this.cameraOverride,
-        speedFactor: fs.speedFactor, thrust: clamp(fs.pct / 1.1, 0, 1.2), jolt: cfg.enabled ? fs.jolt * cfg.punch * 0.35 : 0,
+        t: state.t, dt: dtStory, scene: sc, cameraOverride: this.cameraOverride,
+        speedFactor, thrust: clamp(fs.pct / 1.1, 0, 1.2), jolt: cfg.enabled ? fs.jolt * cfg.punch * 0.35 : 0,
       });
     }
-    if (this.cameraOverride) state.scene.camera = this.cameraOverride;
+    if (this.cameraOverride) sc.camera = this.cameraOverride;
     this.stage.update({
-      state, dt: wall, now, rider: live, ftp: this.settings.ftp, maxHr: this.settings.maxHr, feel: fs, feelConfig: cfg, speed,
-      anchors: this.world?.anchors ?? {}, showInserts: this.showInserts, flash: this.flash,
+      state, dt: wall, now, rider: live, ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, feel: fs, feelConfig: cfg, speed,
+      anchors: this.world?.anchors ?? {}, showInserts: this.showInserts, flash: this.flash, nav, showSubtitles: this.cfg.subtitles,
     });
     if (this.audio && realtime) {
       this.audio.update({
@@ -345,7 +438,12 @@ export class RideApp {
     const sim = this.devices.simTrainer;
     if (!sim) return;
     sim.setPedalling(this.pedalling);
-    sim.setOverride(this.effortScale === 1 ? null : (targetWatts ?? this.settings.ftp * 0.6) * this.effortScale);
+    if (this.freeRide) {
+      // With no target to follow, the simulated rider cruises at endurance pace and leans into the hills.
+      sim.setOverride(this.cfg.ftp * clamp(0.65 + this.freeRide.grade * 0.05, 0.4, 1.05) * this.effortScale);
+      return;
+    }
+    sim.setOverride(this.effortScale === 1 ? null : (targetWatts ?? this.cfg.ftp * 0.6) * this.effortScale);
   }
 
   /* ------------------------------------------------------------------ */
@@ -357,9 +455,9 @@ export class RideApp {
     bar.id = 'bar';
     bar.innerHTML = `
       <button data-act="play">Pause</button><button data-act="back">−10 s</button><button data-act="fwd">+10 s</button>
-      <button data-act="jump">Scenes</button><button data-act="cam">Camera: auto</button><button data-act="mute">Sound on</button>
-      <button data-act="ins">Storyboard cuts: on</button><button data-act="pos">HUD: ${this.settings.hudPos === 'top' ? 'top' : 'bottom'}</button>
-      <button data-act="feel">Feel: ${FEEL_LABEL[this.settings.feel]}</button>
+      <button data-act="jump">Scenes</button><button data-act="cam">Camera: ${this.cameraOverride ?? 'auto'}</button><button data-act="mute">Sound on</button>
+      <button data-act="ins">Storyboard cuts: ${this.showInserts ? 'on' : 'off'}</button><button data-act="pos">HUD: ${this.cfg.hudPosition === 'top' ? 'top' : 'bottom'}</button>
+      <button data-act="feel">Feel: ${this.session ? 'yours' : FEEL_LABEL[this.settings.feel]}</button>
       <span data-sim><button data-act="pedal">Stop pedalling</button>
       <label>Effort <input data-effort type="range" min="40" max="160" value="100" aria-label="Simulated rider effort, percent of target"></label></span>
       <button data-act="full">Full screen</button><button data-act="end">End ride</button>`;
@@ -390,12 +488,13 @@ export class RideApp {
       mute: () => { if (this.audio) { this.audio.muted = !this.audio.muted; label('mute', this.audio.muted ? 'Sound off' : 'Sound on'); } },
       ins: () => { this.showInserts = !this.showInserts; label('ins', `Storyboard cuts: ${this.showInserts ? 'on' : 'off'}`); },
       pos: () => {
-        this.settings.hudPos = this.settings.hudPos === 'top' ? 'bot' : 'top';
-        this.stage?.setHudPosition(this.settings.hudPos); saveSettings(this.settings);
-        label('pos', `HUD: ${this.settings.hudPos === 'top' ? 'top' : 'bottom'}`);
+        this.cfg = { ...this.cfg, hudPosition: this.cfg.hudPosition === 'top' ? 'bot' : 'top' };
+        this.stage?.setHudPosition(this.cfg.hudPosition);
+        if (!this.session) { this.settings.hudPos = this.cfg.hudPosition; saveSettings(this.settings); }
+        label('pos', `HUD: ${this.cfg.hudPosition === 'top' ? 'top' : 'bottom'}`);
       },
       feel: () => {
-        const next = FEEL_ORDER[(FEEL_ORDER.indexOf(this.settings.feel) + 1) % FEEL_ORDER.length];
+        const next = FEEL_ORDER[(FEEL_ORDER.indexOf(this.feelName as FeelPresetName) + 1) % FEEL_ORDER.length];
         this.setFeel(next);
         label('feel', `Feel: ${FEEL_LABEL[next]}`);
       },
@@ -438,10 +537,16 @@ export class RideApp {
   private keyHandler: (e: KeyboardEvent) => void = () => undefined;
   private readonly boundKey = (e: KeyboardEvent): void => this.keyHandler(e);
 
+  /** The preset last chosen from the control bar. A ride from the menus starts on the player's own settings. */
+  private feelName: FeelPresetName | 'yours' = 'yours';
+
   setFeel(name: FeelPresetName): void {
-    this.settings.feel = name;
-    this.feel.config = { ...FEEL_PRESETS[name] };
-    saveSettings(this.settings);
+    this.feelName = name;
+    const feel = { ...FEEL_PRESETS[name] };
+    if (this.cfg.reducedMotion) { feel.punch = 0; feel.twitch = 0; feel.stopMs = 0; }
+    this.cfg = { ...this.cfg, feel };
+    this.feel.config = { ...feel };
+    if (!this.session) { this.settings.feel = name; saveSettings(this.settings); }
     this.stage?.toast(`Feel: ${FEEL_LABEL[name]}`);
   }
 
@@ -461,7 +566,7 @@ export class RideApp {
     const ride = this.recorder.ride();
     if (ride.samples.length === 0) return undefined;
     this.lastFit = encodeFitActivity(ride, {
-      ftp: this.settings.ftp, maxHr: this.settings.maxHr, productName: ENGINE_NAME,
+      ftp: this.cfg.ftp, maxHr: this.cfg.maxHr, productName: ENGINE_NAME,
       utcOffsetSeconds: -new Date().getTimezoneOffset() * 60,
     });
     return this.lastFit;
@@ -474,8 +579,41 @@ export class RideApp {
     void this.audio?.setPlaying(false).catch(() => undefined);
     void this.devices.trainer?.release().catch(() => undefined);
     const samples = this.recorder.samples;
-    this.summary = samples.length ? summarise(samples, this.settings.ftp, this.settings.maxHr) : undefined;
+    this.summary = samples.length ? summarise(samples, this.cfg.ftp, this.cfg.maxHr) : undefined;
+    if (this.session) {
+      const result: RideResult = {
+        complete: this.complete, startTime: this.startTime, summary: this.summary, fit: this.fitBytes(),
+        flags: { ...(this.state?.flags ?? {}) }, simulated: this.devices.power?.info.kind === 'sim',
+      };
+      const done = this.session.onFinish;
+      this.dispose();
+      done(result);
+      return;
+    }
     this.showEnd();
+  }
+
+  /** Stop drawing, release the audio device and remove everything the ride put on the page. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    this.started = false;
+    clearTimeout(this.idleTimer);
+    removeEventListener('keydown', this.boundKey);
+    document.removeEventListener('visibilitychange', this.onVisible);
+    this.root.removeEventListener('mousemove', this.wake);
+    this.root.removeEventListener('touchstart', this.wake);
+    void this.audio?.dispose();
+    this.audio = undefined;
+    this.world?.dispose();
+    this.world = undefined;
+    this.stage?.dispose();
+    this.stage = undefined;
+    this.root.classList.remove('idle');
+    this.root.removeAttribute('id');
+    this.root.innerHTML = '';
   }
 
   private showEnd(): void {

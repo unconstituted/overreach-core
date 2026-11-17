@@ -26,6 +26,9 @@ export interface StageFrame {
   /** Screen anchors from the world, for tags. */
   anchors: Record<string, { x: number; y: number } | null>;
   showInserts: boolean;
+  /** Replaces the heading read-out on the right (free rides show grade and distance to go). */
+  nav?: string;
+  showSubtitles: boolean;
   /** Transient centre notice from the app (step changes and the like). */
   flash?: { title: string; text: string; tone?: 'alert' | 'danger' };
 }
@@ -192,6 +195,14 @@ export class Stage {
     this.el.visor.classList.toggle('bot', pos === 'bot');
   }
 
+  setSubtitleSize(size: 'small' | 'medium' | 'large'): void {
+    this.el.subs.style.fontSize = size === 'small' ? 'clamp(12px, 1.2vw, 17px)' : size === 'large' ? 'clamp(19px, 2.2vw, 30px)' : '';
+  }
+
+  setWorkoutStrip(show: boolean): void {
+    this.el.strip.style.display = show ? '' : 'none';
+  }
+
   setPaused(paused: boolean): void {
     this.el.paused.style.opacity = paused ? '1' : '0';
   }
@@ -338,7 +349,8 @@ export class Stage {
     const a = feel.accel * 50;
     el.abar.style.left = `${a < 0 ? 50 + a : 50}%`; el.abar.style.width = `${Math.abs(a)}%`;
     const map = widget('map');
-    if (map) {
+    if (f.nav !== undefined) this.T('nav', f.nav);
+    else if (map) {
       const hdg = String(Math.round((212 + 20 * noise1(t * 0.02) + 360) % 360)).padStart(3, '0');
       const id = state.scene.id;
       this.T('nav', `${hdg}° · ${id === 'ice' ? `ALT ${Math.round(4 + 2 * noise1(t * 0.4))} M` : id === 'tunnel' || id === 'stills' ? 'DOCK' : 'VAC'}`);
@@ -369,6 +381,7 @@ export class Stage {
       if (t >= lostAt) tone = 'danger';
       wave = sub && sub.speaker === call.params.name ? 'talk' : 'idle';
     } else if (modes) { ct = String((modes.params.lines as string[] | undefined)?.[0] ?? ''); cs = String((modes.params.lines as string[] | undefined)?.slice(1).join('\n') ?? ''); }
+    else if (state.workout.texts.length) { ct = 'CONTROL'; cs = state.workout.texts[state.workout.texts.length - 1].message; }
     else if (f.flash) { ct = f.flash.title; cs = f.flash.text; tone = f.flash.tone ?? ''; }
     else {
       const note = [...hudS.notices].reverse().find((n) => n.kind !== 'warning');
@@ -442,7 +455,7 @@ export class Stage {
     } else el.gateov.style.opacity = '0';
 
     /* ----- subtitles (the AI speaks on the visor instead) ----- */
-    const showSub = sub && !(sub.speaker === 'AI' && helmet && ct === 'SHIP AI');
+    const showSub = f.showSubtitles && sub && !(sub.speaker === 'AI' && helmet && ct === 'SHIP AI');
     const sh = showSub ? `<b>${esc(sub.speaker)}</b> ${esc(sub.text)}` : '';
     if (this.text.get('subs') !== sh) { this.text.set('subs', sh); el.subs.innerHTML = sh; }
     el.subs.style.opacity = sh ? '1' : '0';

@@ -27,6 +27,8 @@ export interface LiveData {
   cadence?: number;
   heartRate?: number;
   gameSpeed?: number;
+  /** Road speed in m/s from elsewhere (a map with hills, a treadmill). When absent, the flat-road bike model is used. */
+  roadSpeed?: number;
 }
 
 export interface Ride {
@@ -48,6 +50,8 @@ export class RideRecorder {
   private last = 0;
   private accPower = 0;
   private accGame = 0;
+  private accRoad = 0;
+  private roadTime = 0;
   private accTime = 0;
   private lastLive: LiveData = { power: 0 };
   private bikeSpeed = 0;
@@ -66,6 +70,7 @@ export class RideRecorder {
       // Hold the previous reading until now (zero-order hold), as the data was valid over that span.
       this.accPower += this.lastLive.power * dt;
       this.accGame += (this.lastLive.gameSpeed ?? 0) * dt;
+      if (this.lastLive.roadSpeed !== undefined) { this.accRoad += this.lastLive.roadSpeed * dt; this.roadTime += dt; }
       this.accTime += dt;
       if (to === boundary) this.emit(boundary);
       from = to;
@@ -77,7 +82,9 @@ export class RideRecorder {
   private emit(t: number): void {
     const span = this.accTime || 1;
     const power = this.accPower / span;
-    this.bikeSpeed = stepBikeSpeed(this.bikeSpeed, power, 1, this.bike);
+    this.bikeSpeed = this.roadTime > 0 ? this.accRoad / this.roadTime : stepBikeSpeed(this.bikeSpeed, power, 1, this.bike);
+    this.accRoad = 0;
+    this.roadTime = 0;
     this.distance += this.bikeSpeed;
     this.samples.push({
       t, power: Math.round(power), cadence: this.lastLive.cadence, heartRate: this.lastLive.heartRate,

@@ -44,7 +44,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 button.on { border-color: var(--cyan); background: rgba(127, 233, 255, 0.1); color: var(--cyan); }
 button.primary { border-color: var(--cyan); background: var(--cyan); color: #04141a; font-weight: 600; }
 button.primary:hover:not(:disabled) { background: #b4f3ff; }
-input[type='number'], select {
+input[type='number'], input[type='text'], input[type='date'], select {
   font: inherit; color: var(--ink); background: #070b12; border: 1px solid var(--line);
   border-radius: 4px; padding: 8px 10px; width: 110px;
 }

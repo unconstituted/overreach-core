@@ -18,7 +18,7 @@ chapters/*.chapter.json ──► ChapterRuntime ──► ChapterState (every t
                               RideRecorder ──► summary ──► FIT activity file
 ```
 
-`src/web/ride/app.ts` is the only place that knows about all of them. Each frame it:
+`src/web/ride/app.ts` is the only place that knows about all of them. (Around it sit the menus, described under "Content, player and menus" below.) Each frame it:
 
 1. advances story time `T` by the wall clock;
 2. asks the workout runner for the target, and tells the trainer (ERG target, or flat-road simulation when a step has ERG off);
@@ -37,10 +37,17 @@ chapters/*.chapter.json ──► ChapterRuntime ──► ChapterState (every t
 | `src/core/record` | 1 Hz recorder, bike-speed physics, summary stats, FIT activity export | Yes |
 | `src/core/chapter` | Chapter types, curves, `ChapterRuntime`, semantic checks, ride-script converter | Yes |
 | `src/core/feel` | The feel maths: strokes, peak hold, speed spring, presets | Yes |
-| `src/core/util` | Maths helpers, seeded random numbers, noise | Yes |
+| `src/core/content` | Types for workouts, plans, maps and seasons; unlock rules; the catalogue build; chapters generated from a workout or a map; the free-ride model | Yes |
+| `src/core/player` | The player document (profile, progress, history, settings), migrations, `PlayerStore` over a storage-backend interface | Yes; swap the backend for a save game or a server |
+| `src/core/settings` | The settings table and `rideConfig` | Yes: the table can drive any options menu |
+| `src/core/plan` | Scheduling, missed sessions, pause and resume, matching a ride to a session | Yes |
+| `src/core/progress` | Unlock evaluation and `applyRide` | Yes |
+| `src/core/util` | Maths helpers, seeded random numbers, noise, dates, base64 | Yes |
 | `src/devices/protocol` | FTMS, Cycling Power and Heart Rate packet parsing and building (pure functions) | Yes (the byte layouts are the Bluetooth specs) |
 | `src/devices` | Device interfaces, `FtmsTrainer` control logic, simulators, `DeviceManager`, Web Bluetooth plumbing | Logic yes; `bluetooth.ts` is browser-only and would be replaced by the platform's BLE API |
-| `src/web/ride` | World, stage (HUD and overlays), audio, the app loop, start and end screens | No. This is the browser presentation layer and the part Unreal replaces |
+| `src/web/ride` | World, stage (HUD and overlays), audio, the ride loop | No. This is the browser presentation layer and the part Unreal replaces |
+| `src/web/menu` | The menu shell, screens, browser storage adapter | No. Functional prototypes of the flows; Unreal rebuilds them (in UMG or Common UI) on the same core |
+| `content/` | Workouts, plans, maps, seasons | Yes: data |
 | `chapters/`, `schemas/` | Chapter data and its JSON schema | Yes: the data is the contract |
 | `tools/` | Chapter validation, the Chapter 1 port, the ride-script converter, headless checks | Build-time only |
 
@@ -88,6 +95,28 @@ Code, keyed by an id the data refers to:
 
 An unknown id is ignored (with a console warning for sounds), so a chapter written ahead of the code still plays.
 
+## Content, player and menus
+
+Three layers, kept apart on purpose:
+
+- **Content** is what ships: chapters in `chapters/`, everything else in `content/`. `buildCatalogue` (`src/core/content/catalogue.ts`) reads all of it and writes one index, `content/catalogue.json`, holding the fields menus list and filter on (title, duration, estimated intensity and stress, a power graph, plan length, map length and climb, unlock rule). It is also where references are checked, so a plan cannot point at a workout that is not there. The catalogue is generated (and git-ignored): `tools/content.ts` does the file reading, and a small Vite plugin runs it on start-up, on every content change in development, and before a production build, where a problem fails the build.
+- **Player state** is what the player owns: one versioned document (`PlayerData`) with profile, settings, progress and ride history, plus one `.fit` per ride stored beside it. `PlayerStore` talks to a four-method `StorageBackend`; the browser adapter uses IndexedDB and falls back to localStorage. Older documents are upgraded by `migrate`, one version at a time. Export is a single JSON file with the ride files inside it.
+- **Screens** (`src/web/menu`) are functions from the app object to DOM. They hold no logic worth porting: everything they show comes from the core.
+
+The flow of a ride from the menus:
+
+1. `MenuApp.prepare(ref)` turns `chapter:<id>`, `workout:<id>` or `map:<id>` into a chapter to play. Story chapters are loaded as they are. A workout or a map becomes a chapter on the fly (`chapterFromWorkout`, `chapterFromMap`), so there is one runtime, one HUD and one recorder for everything.
+2. `rideConfig(profile, settings)` produces the ride's configuration, and `RideApp` runs it as a session, with the season's story flags passed in as `initialFlags`.
+3. When the ride ends, `applyRide` folds the result into the player: history, totals, chapter completion, flags, the plan session it counted for (`matchRide`), and anything newly unlocked. The post-ride screen shows what `applyRide` reports.
+
+**Free rides** are the one place the rider drives distance. `FreeRide` integrates the bike model along the map's gradient profile; the app overrides the scene's speed and distance with its figures (times the map's `speedScale`), sends the grade to the trainer's simulation mode, and feeds the true road speed to the recorder. The ride ends at the end of the map.
+
+**Settings** are one table (`src/core/settings/table.ts`). The options menu, validation of saved values, presets and the ride configuration all derive from it.
+
+**Dates.** The core never asks what day it is. Callers pass today's date as an ISO string; `?today=2026-12-01` on the address overrides it in the browser, which is how the headless check (and you) can look at week 3 of a plan without waiting.
+
+Opening `/?chapter=ch1` (or `?auto`) bypasses all of this and plays one chapter directly with its own small start and end screens. That path exists for development and for `npm run check:ride`.
+
 ## Devices
 
 The game talks to three interfaces in `src/devices/types.ts`: `PowerSource`, `HeartRateSource` and `ControllableTrainer`. `DeviceManager` owns the current sources and exposes `live` readings.
@@ -116,6 +145,7 @@ All parameters live in one `FeelConfig` object. `FEEL_PRESETS` has `off`, `restr
 
 - `npm test`: unit tests for everything in `src/core` and `src/devices`, including the property test on workout durations, FIT round trips, byte-level protocol fixtures, runtime seeking and the Chapter 1 port.
 - `npm run validate`: schema and semantic checks on every chapter.
+- `npm run check:menu`: builds, then walks the menus in headless Chromium: start a plan, ride today's session at accelerated time, see it completed and the plan advance, change settings and reload, come back three days later to a pushed session, free-ride a map, re-download a `.fit`, export and import, and confirm that a plan served purely as data shows up.
 - `npm run check:ride`: builds, then rides the whole chapter in headless Chromium at accelerated time with the simulated rider, checks seeking and stop-pedalling behaviour, and decodes the downloaded `.fit`. It needs Playwright, which is not a project dependency.
 
 ## Known limits

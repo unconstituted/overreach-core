@@ -38,6 +38,8 @@ export interface AudioFrame {
 export class RideAudio {
   readonly ctx: AudioContext;
   muted = false;
+  /** Player volume settings, 0 to 1 each. */
+  volume = { master: 1, dialogue: 1, music: 1, effects: 1 };
   /** Stream of the final mix, for capture in tests. */
   tap?: MediaStreamAudioDestinationNode;
   private readonly master: GainNode;
@@ -317,6 +319,12 @@ export class RideAudio {
     s.onended = () => { const i = this.live.indexOf(s); if (i >= 0) this.live.splice(i, 1); };
   }
 
+  /** Stop everything and release the audio device. */
+  async dispose(): Promise<void> {
+    this.stopClips();
+    try { await this.ctx.close(); } catch { /* already closed */ }
+  }
+
   stopClips(): void {
     for (const s of this.live) { try { s.stop(); } catch { /* already stopped */ } }
     this.live = [];
@@ -379,9 +387,10 @@ export class RideAudio {
     }
     set(this.musF.frequency, Math.max(50, amb('musicCutoff', 16000)), 0.2);
     const duck = f.state.dialogue.subtitle ? 0.5 : 1;
-    set(this.mus.gain, 0.8 * duck * amb('musicTrim', 1), 0.12);
-    set(this.sfx.gain, 0.9 * (duck < 1 ? 0.65 : 1), 0.12);
-    set(this.master.gain, this.muted ? 0 : 0.72, 0.05);
+    set(this.mus.gain, 0.8 * duck * amb('musicTrim', 1) * this.volume.music, 0.12);
+    set(this.sfx.gain, 0.9 * (duck < 1 ? 0.65 : 1) * this.volume.effects, 0.12);
+    set(this.dlg.gain, 1.25 * this.volume.dialogue, 0.12);
+    set(this.master.gain, this.muted ? 0 : 0.72 * this.volume.master, 0.05);
   }
 
   /** Feel-layer sounds: the stroke tick and the peak-break clack. */

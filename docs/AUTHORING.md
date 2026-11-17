@@ -209,9 +209,136 @@ The engine ignores `notes`. The ride-script converter puts everything it could n
 - Images: JPEG, in the folder named by `assets.images`, referred to without the extension.
 - `npm run validate` reports any clip or image a chapter names that is not on disk.
 
+# Other content: workouts, plans, maps and seasons
+
+Everything else the game ships with lives in `content/`, one JSON file per item. As with chapters, adding one never needs a code change: drop the file in, and it appears in the menus. `npm run validate` checks every file and every reference between them; `npm run dev` rebuilds the catalogue as you save.
+
+Ids are lower-case letters, digits and hyphens. The file name should match the id.
+
+## Workouts (`content/workouts/<id>.workout.json`)
+
+```json
+{
+  "$schema": "../../schemas/workout.schema.json",
+  "format": 1,
+  "id": "burn-windows",
+  "title": "Burn Windows",
+  "description": "Five three-minute burns at VO2 max. Each window is short. Use all of it.",
+  "sport": "bike",
+  "focus": "vo2",
+  "difficulty": 4,
+  "tags": ["vo2 max"],
+  "steps": [
+    { "kind": "ramp", "duration": 600, "from": 0.45, "to": 0.75, "label": "Systems warm", "intensity": "warmup" },
+    { "kind": "intervals", "repeat": 5, "on": { "duration": 180, "power": 1.15, "label": "Burn window" }, "off": { "duration": 180, "power": 0.5, "label": "Coast" }, "erg": false },
+    { "kind": "ramp", "duration": 420, "from": 0.6, "to": 0.4, "label": "Power down", "intensity": "cooldown" }
+  ]
+}
+```
+
+- `steps` are exactly the steps described under "Workout" above.
+- To use a Zwift or Garmin file instead, put it beside the JSON and write `"file": "storm-front.zwo"` in place of `steps`. Its text events show on the visor.
+- `focus` is one of `recovery`, `endurance`, `tempo`, `sweetspot`, `threshold`, `vo2`, `anaerobic`, `sprint`, `mixed`, `test`. `difficulty` is 1 to 5. Both are for the library's filters.
+- Duration, intensity, training stress and whether it counts as a hard day are worked out for you from the steps.
+- A plain workout is ridden in open space, with the ship's speed following the targets. Step text (`texts`) appears in the centre of the visor under "CONTROL", so use it for coaching lines.
+
+## Plans (`content/plans/<id>.plan.json`)
+
+```json
+{
+  "$schema": "../../schemas/plan.schema.json",
+  "format": 1,
+  "id": "shakedown-week",
+  "title": "Shakedown Week",
+  "description": "Three rides in seven days to learn the controls.",
+  "sport": "bike",
+  "level": "beginner",
+  "goal": "Try the game and a training week",
+  "hoursPerWeek": [2, 2.5],
+  "style": "calendar",
+  "weeks": [
+    {
+      "title": "Shakedown", "focus": "Find your feet",
+      "days": [
+        { "day": 1, "sessions": [{ "ref": "workout:dock-spin", "note": "If this is not easy, lower your FTP." }] },
+        { "day": 3, "sessions": [{ "ref": "workout:long-haul", "alternatives": ["workout:dock-spin"] }] },
+        { "day": 6, "sessions": [{ "ref": "chapter:ch1" }] }
+      ]
+    }
+  ]
+}
+```
+
+- A session points at `workout:<id>` or `chapter:<id>`. A reference to something that does not exist fails validation.
+- `day` is the day of the plan week, 1 to 7. **Day 1 is the day the player starts**, not Monday. Leave rest days out.
+- `"optional": true` marks a session the plan can live without: if missed it is dropped, never rescheduled.
+- `alternatives` are swaps the player may pick on the day (a shorter or easier version).
+- `style` is `calendar` for a training block or `story` for a plan built round a season's chapters (name it with `"season": "season-1"`). The two work the same; the label tells the player what they are getting.
+- `level` is `beginner`, `intermediate` or `advanced`; `hoursPerWeek` is `[low, high]`.
+
+What the engine does with it, so you can design for it: a missed session is pushed to the next free day of the same week, unless that would put two hard days back to back, in which case it is dropped (players can choose "skip" instead in Settings). So do not put hard sessions on consecutive days, and give the player an easy alternative on the hardest days.
+
+## Maps (`content/maps/<id>.map.json`)
+
+```json
+{
+  "$schema": "../../schemas/map.schema.json",
+  "format": 1,
+  "id": "terror-flats",
+  "title": "Terror Flats",
+  "description": "Low over the ice plains of Terror.",
+  "use": ["freeRide"],
+  "length": 15000,
+  "profile": [[0, 0], [2000, 0.5], [3000, 3], [3800, 4.5], [4200, -2], [15000, 0]],
+  "image": "ch1/images/s09.jpg",
+  "scene": { "id": "ice", "speedScale": 14, "fov": [72, 100], "env": { }, "streaks": { } },
+  "unlock": { "type": "chapterCompleted", "chapter": "ch1" }
+}
+```
+
+- `length` is metres of road; `profile` is `[distance in metres, grade in percent]` keys. The trainer feels the grade (scaled by the player's "trainer difficulty" setting), and the rider's power moves the ship through a bike model. Keep grades within ±25%.
+- `scene.id` is a scene kit. `speedScale` is how many metres of scenery pass per metre of road: open space needs a big number (40 to 60) to feel like anything; low over ice, 12 to 15.
+- `scene.env` and `scene.streaks` set the look. Copy them from a chapter moment you like (the `scene.env` and `scene.streaks` entries in `ch1.chapter.json`).
+- `image` is a preview, relative to the site root (chapter images live under `ch1/images/...`).
+
+## Seasons (`content/seasons/<id>.season.json`)
+
+```json
+{
+  "$schema": "../../schemas/season.schema.json",
+  "format": 1,
+  "id": "season-1",
+  "title": "The Dark Segment",
+  "number": 1,
+  "description": "A routine race day ends with the station gone and one pilot down on the ice.",
+  "chapters": [{ "id": "ch1" }, { "id": "ch2" }],
+  "flags": ["clampLocked"]
+}
+```
+
+- Chapters unlock in order: the first is open, each of the rest opens when the one before it is completed. Give a chapter its own `unlock` to override that.
+- Story flags set by a chapter's challenges are kept per season and handed to the next chapter, so `"if": "clampLocked"` in Chapter 3 can react to what happened in Chapter 2. List the flags the season uses in `flags`, for the record.
+
+## Unlock rules
+
+Plans, maps, seasons and chapters (through their season) can carry an `unlock`. It is one of:
+
+| Rule | Opens when |
+| --- | --- |
+| `{ "type": "always" }` | From the start (the same as leaving `unlock` out) |
+| `{ "type": "chapterCompleted", "chapter": "ch1" }` | That chapter has been ridden to the end |
+| `{ "type": "flag", "season": "season-1", "flag": "clampLocked" }` | A story flag is set (add `"value": false` for "is not set") |
+| `{ "type": "totalDistance", "km": 50 }` | The player has ridden that far in total |
+| `{ "type": "totalTime", "hours": 10 }` | The player has ridden that long in total |
+| `{ "type": "planWeek", "week": 3, "plan": "base-builder" }` | The player has reached that week of a plan (leave `plan` out for any plan) |
+| `{ "type": "all", "rules": [ ... ] }` | Every rule inside is met |
+| `{ "type": "any", "rules": [ ... ] }` | At least one is met |
+
+Once something unlocks it stays unlocked. The player is told what unlocked on the screen after the ride, and locked items show how to open them.
+
 ## Checklist before you call it done
 
-- `npm run validate` passes.
+- `npm run validate` passes (it covers chapters and everything in `content/`).
 - The workout total matches `duration`.
 - You have ridden it once start to finish with the simulated rider, and scrubbed back through the busy parts.
 - Every challenge has been tried both ways: on the ride's control bar, the Effort slider and **Stop pedalling** let you fail on purpose.

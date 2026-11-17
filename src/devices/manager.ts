@@ -153,6 +153,15 @@ export class DeviceManager {
     p.catch(() => { this.lastTarget = NaN; }); // retry on the next call
   }
 
+  /** Free riding: send the road grade (percent) to the trainer's simulation mode. */
+  applyGrade(grade: number): void {
+    if (!this.trainer) return;
+    const key = -100000 - Math.round(grade * 10);
+    if (key === this.lastTarget) return;
+    this.lastTarget = key;
+    this.trainer.setSimulation({ grade }).catch(() => { this.lastTarget = NaN; });
+  }
+
   async disconnectAll(): Promise<void> {
     this.unsubPower.forEach((u) => u());
     this.unsubHeart.forEach((u) => u());
